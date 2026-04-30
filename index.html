@@ -487,10 +487,10 @@ function RoseSVG({marks,onPlace,linked,hover,setHover,lang,hoverPos,setHoverPos,
   };
   const rings=[1,2,3];
   // Number label style: dark outline for readability
-  const ns={fill:TEAL_D,fontSize:11,fontWeight:"bold",
-    stroke:"white",strokeWidth:3,paintOrder:"stroke fill"};
+  const ns={fill:TEAL_D,fontSize:16,fontWeight:"bold",
+    stroke:"white",strokeWidth:4,paintOrder:"stroke fill"};
   // Outer axis label style
-  const ls={fill:TEAL_D,fontSize:13,fontWeight:"bold"};
+  const ls={fill:TEAL_D,fontSize:18,fontWeight:"bold"};
 
   const handleMouseMove=ev=>{
     const[x,y]=pt(ev);
@@ -512,8 +512,8 @@ function RoseSVG({marks,onPlace,linked,hover,setHover,lang,hoverPos,setHoverPos,
 
   return e('svg',{
     ref,
-    viewBox:"-125 -65 750 650",
-    style:{width:"100%",maxWidth:480,touchAction:"none",cursor:"crosshair",display:"block",margin:"0 auto"},
+    viewBox:"-145 -90 790 690",
+    style:{width:"100%",maxWidth:660,touchAction:"none",cursor:"crosshair",display:"block",margin:"0 auto"},
     onPointerDown:ev=>{dn.current=pt(ev);},
     onPointerUp:ev=>{
       if(!dn.current)return;
@@ -632,7 +632,7 @@ function RoseSVG({marks,onPlace,linked,hover,setHover,lang,hoverPos,setHoverPos,
 
     /* ── ghost mark at snap point ── */
     ghostSvg&&!ghostAlreadyPlaced?e('circle',{
-      cx:ghostSvg[0],cy:ghostSvg[1],r:10,
+      cx:ghostSvg[0],cy:ghostSvg[1],r:12,
       fill:CORAL,opacity:0.25,stroke:CORAL,strokeWidth:1.5,strokeDasharray:"3,2"
     }):null,
     ghostSvg&&ghostAlreadyPlaced?e('circle',{
@@ -645,10 +645,10 @@ function RoseSVG({marks,onPlace,linked,hover,setHover,lang,hoverPos,setHoverPos,
       const[sx,sy]=toSvg(m.g,m.o);
       const isHovered=hover===i;
       return e('g',{key:i},
-        isHovered?e('circle',{cx:sx,cy:sy,r:16,fill:CORAL,opacity:0.15}):null,
-        e('circle',{cx:sx,cy:sy,r:9,fill:CORAL,stroke:"white",strokeWidth:2}),
+        isHovered?e('circle',{cx:sx,cy:sy,r:18,fill:CORAL,opacity:0.15}):null,
+        e('circle',{cx:sx,cy:sy,r:11,fill:CORAL,stroke:"white",strokeWidth:2.5}),
         // small X on hover to signal "tap to remove"
-        isHovered?e('text',{x:sx,y:sy+4,fill:"white",fontSize:10,fontWeight:"bold",
+        isHovered?e('text',{x:sx,y:sy+5,fill:"white",fontSize:14,fontWeight:"bold",
           textAnchor:"middle",fontFamily:"sans-serif"},"×"):null
       );
     })
@@ -826,7 +826,7 @@ function App(){
   if(phase==="draw")return e('div',{style:{fontFamily:"sans-serif",background:BG,minHeight:"100vh",
     position:"relative",display:"flex",flexDirection:"column",alignItems:"center",padding:"10px 10px 30px"}},
     e(LangPicker,{lang,setLang}),
-    e('div',{style:{maxWidth:500,width:"100%"}},
+    e('div',{style:{maxWidth:680,width:"100%"}},
       e('div',{style:{display:"flex",alignItems:"center",gap:10,marginBottom:6,marginTop:8}},
         e('button',{onClick:()=>setPhase("identity"),
           style:{background:"none",border:"none",fontSize:22,color:TEAL_D,cursor:"pointer"}},"\u2190"),
