@@ -386,6 +386,7 @@ const L={
     doneTitle:"Thank you!",doneSub:"Your response has been recorded anonymously.",
     doneLabel:"Your XYGO notation",newResp:"New response",
     female:"Female",male:"Male",same:"Same sex",other:"Other sex",
+    genderAxis:"\u2195 Gender identity (N/S axis)",orientAxis:"\u2194 Sexual orientation (E/W axis)",
     errMsg:"Could not send response. Please check your connection and try again.",
   },
   it:{
@@ -429,6 +430,7 @@ const L={
     doneTitle:"Grazie!",doneSub:"La tua risposta \u00e8 stata registrata anonimamente.",
     doneLabel:"La tua notazione XYGO",newResp:"Nuova risposta",
     female:"Femminile",male:"Maschile",same:"Stesso sesso",other:"Sesso opposto",
+    genderAxis:"\u2195 Identit\u00e0 di genere (asse N/S)",orientAxis:"\u2194 Orientamento sessuale (asse E/O)",
     errMsg:"Invio non riuscito. Controlla la connessione e riprova.",
   }
 };
@@ -472,7 +474,7 @@ function PillGroup({opts,choice,onChange,otherVal,onOtherChange,placeholder}){
   );
 }
 
-function RoseSVG({marks,onPlace,linked,hover,setHover,lang}){
+function RoseSVG({marks,onPlace,linked,hover,setHover,lang,hoverPos,setHoverPos}){
   const ref=useRef(null);
   const dn=useRef(null);
   const t=L[lang];
@@ -481,13 +483,30 @@ function RoseSVG({marks,onPlace,linked,hover,setHover,lang}){
     const s=ev.touches?.[0]??ev;
     return[(s.clientX-r.left)*580/r.width-40,(s.clientY-r.top)*580/r.height-40];
   };
-  const ns={fill:"white",fontSize:12,fontWeight:"bold",
-    stroke:"rgba(0,0,0,0.28)",strokeWidth:2.5,paintOrder:"stroke fill"};
+  const rings=[1,2,3];
+  // Number label style: dark outline for readability
+  const ns={fill:TEAL_D,fontSize:11,fontWeight:"bold",
+    stroke:"white",strokeWidth:3,paintOrder:"stroke fill"};
+  // Outer axis label style
   const ls={fill:TEAL_D,fontSize:13,fontWeight:"bold"};
 
-  const rots45=[45,135,225,315];
-  const rots90=[0,90,180,270];
-  const rings=[1,2,3];
+  const handleMouseMove=ev=>{
+    const[x,y]=pt(ev);
+    const hi=marks.findIndex(m=>{const[sx,sy]=toSvg(m.g,m.o);return d2(x,y,sx,sy)<20;});
+    setHover(hi);
+    if(inZone(x,y)){
+      const g=Math.max(-MAX,Math.min(MAX,Math.round((CY-y)/U)));
+      const o=Math.max(-MAX,Math.min(MAX,Math.round((x-CX)/U)));
+      setHoverPos({g,o});
+    } else {
+      setHoverPos(null);
+    }
+  };
+  const handleMouseLeave=()=>{ setHover(-1); setHoverPos(null); };
+
+  // Snap position for ghost mark
+  const ghostSvg = hoverPos ? toSvg(hoverPos.g, hoverPos.o) : null;
+  const ghostAlreadyPlaced = hoverPos ? marks.some(m=>m.g===hoverPos.g&&m.o===hoverPos.o) : false;
 
   return e('svg',{
     ref,
@@ -500,29 +519,75 @@ function RoseSVG({marks,onPlace,linked,hover,setHover,lang}){
       if(d2(x,y,...dn.current)<10&&inZone(x,y))onPlace(x,y);
       dn.current=null;
     },
-    onMouseMove:ev=>{
-      const[x,y]=pt(ev);
-      setHover(marks.findIndex(m=>{const[sx,sy]=toSvg(m.g,m.o);return d2(x,y,sx,sy)<20;}));
-    }
+    onMouseMove:handleMouseMove,
+    onMouseLeave:handleMouseLeave,
   },
-    e('circle',{cx:CX,cy:CY,r:218,fill:"none",stroke:TEAL_P,strokeWidth:1.5}),
-    e('circle',{cx:CX,cy:CY,r:202,fill:"#e7f5f4"}),
-    ...rots45.map(r=>e('path',{key:`d${r}`,d:DIAG,fill:TEAL_L,transform:`rotate(${r},250,250)`,opacity:0.9})),
-    ...rots90.map(r=>e('path',{key:`c${r}`,d:CARD,fill:TEAL,transform:`rotate(${r},250,250)`})),
-    ...rings.map(n=>e('circle',{key:`r${n}`,cx:CX,cy:CY,r:n*U,fill:"none",stroke:"rgba(255,255,255,0.5)",strokeWidth:1.2})),
-    e('line',{x1:CX,y1:CY-202,x2:CX,y2:CY+202,stroke:"rgba(255,255,255,0.4)",strokeWidth:1.5}),
-    e('line',{x1:CX-202,y1:CY,x2:CX+202,y2:CY,stroke:"rgba(255,255,255,0.4)",strokeWidth:1.5}),
+    /* ── background circle ── */
+    e('circle',{cx:CX,cy:CY,r:202,fill:"#f0fafa"}),
+    e('circle',{cx:CX,cy:CY,r:202,fill:"none",stroke:TEAL_L,strokeWidth:1.5}),
+    e('circle',{cx:CX,cy:CY,r:218,fill:"none",stroke:TEAL_P,strokeWidth:1}),
+
+    /* ── subtle quadrant shading ── */
+    e('clipPath',{id:"roseClip"},e('circle',{cx:CX,cy:CY,r:202})),
+    /* NE: female + same sex = light teal */
+    e('rect',{x:CX,y:CY-202,width:202,height:202,fill:TEAL,opacity:0.07,clipPath:"url(#roseClip)"}),
+    /* NW: female + other sex = very light */
+    e('rect',{x:CX-202,y:CY-202,width:202,height:202,fill:TEAL,opacity:0.04,clipPath:"url(#roseClip)"}),
+    /* SE: male + same sex */
+    e('rect',{x:CX,y:CY,width:202,height:202,fill:TEAL,opacity:0.04,clipPath:"url(#roseClip)"}),
+    /* SW: male + other sex */
+    e('rect',{x:CX-202,y:CY,width:202,height:202,fill:TEAL,opacity:0.02,clipPath:"url(#roseClip)"}),
+
+    /* ── grid lines ── */
+    // faint verticals and horizontals at each integer
+    ...[-3,-2,-1,1,2,3].map(n=>e('line',{key:`gv${n}`,
+      x1:CX+n*U,y1:CY-202,x2:CX+n*U,y2:CY+202,
+      stroke:TEAL_L,strokeWidth:0.5,opacity:0.4})),
+    ...[-3,-2,-1,1,2,3].map(n=>e('line',{key:`gh${n}`,
+      x1:CX-202,y1:CY-n*U,x2:CX+202,y2:CY-n*U,
+      stroke:TEAL_L,strokeWidth:0.5,opacity:0.4})),
+
+    /* ── main axes ── */
+    e('line',{x1:CX,y1:CY-202,x2:CX,y2:CY+202,stroke:TEAL_D,strokeWidth:1.5,opacity:0.6}),
+    e('line',{x1:CX-202,y1:CY,x2:CX+202,y2:CY,stroke:TEAL_D,strokeWidth:1.5,opacity:0.6}),
+
+    /* ── scale rings (subtle) ── */
+    ...rings.map(n=>e('circle',{key:`r${n}`,cx:CX,cy:CY,r:n*U,
+      fill:"none",stroke:TEAL_D,strokeWidth:0.8,opacity:0.2,strokeDasharray:"3,4"})),
+
+    /* ── crosshair guide on hover ── */
+    hoverPos?e('g',{opacity:0.35},
+      e('line',{x1:CX+hoverPos.o*U,y1:CY-210,x2:CX+hoverPos.o*U,y2:CY+210,
+        stroke:CORAL,strokeWidth:1.2,strokeDasharray:"4,3"}),
+      e('line',{x1:CX-210,y1:CY-hoverPos.g*U,x2:CX+210,y2:CY-hoverPos.g*U,
+        stroke:CORAL,strokeWidth:1.2,strokeDasharray:"4,3"})
+    ):null,
+
+    /* ── axis arrows ── */
+    // North arrow head (Female)
+    e('polygon',{points:`${CX-6},${CY-196} ${CX+6},${CY-196} ${CX},${CY-210}`,fill:TEAL_D,opacity:0.7}),
+    // South arrow head (Male)
+    e('polygon',{points:`${CX-6},${CY+196} ${CX+6},${CY+196} ${CX},${CY+210}`,fill:TEAL_D,opacity:0.7}),
+    // East arrow head (Same sex)
+    e('polygon',{points:`${CX+196},${CY-6} ${CX+196},${CY+6} ${CX+210},${CY}`,fill:TEAL_D,opacity:0.7}),
+    // West arrow head (Other sex)
+    e('polygon',{points:`${CX-196},${CY-6} ${CX-196},${CY+6} ${CX-210},${CY}`,fill:TEAL_D,opacity:0.7}),
+
+    /* ── scale numbers ── */
     ...rings.map(n=>e('text',{key:`tp${n}`,x:CX+7,y:CY-n*U+5,...ns},`+${n}`)),
     ...rings.map(n=>e('text',{key:`tm${n}`,x:CX+7,y:CY+n*U+5,...ns},`-${n}`)),
     ...rings.map(n=>e('text',{key:`rp${n}`,x:CX+n*U-9,y:CY-7,...ns},`+${n}`)),
     ...rings.map(n=>e('text',{key:`rm${n}`,x:CX-n*U-12,y:CY-7,...ns},`-${n}`)),
     e('text',{x:CX+6,y:CY+5,...ns},"0"),
-    e('text',{x:CX,y:-20,textAnchor:"middle",...ls},t.female),
-    e('text',{x:CX,y:530,textAnchor:"middle",...ls},t.male),
-    e('text',{x:528,y:CY,textAnchor:"middle",...ls,transform:`rotate(-90,528,${CY})`},t.same),
-    e('text',{x:-28,y:CY,textAnchor:"middle",...ls,transform:`rotate(-90,-28,${CY})`},t.other),
+
+    /* ── axis direction labels (outside circle) ── */
+    e('text',{x:CX,y:-22,textAnchor:"middle",...ls},t.female),
+    e('text',{x:CX,y:532,textAnchor:"middle",...ls},t.male),
+    e('text',{x:530,y:CY,textAnchor:"middle",...ls,transform:`rotate(-90,530,${CY})`},t.same),
+    e('text',{x:-30,y:CY,textAnchor:"middle",...ls,transform:`rotate(-90,-30,${CY})`},t.other),
+
+    /* ── connection segments ── */
     ...(linked&&marks.length>1?(()=>{
-      // Only connect marks that share the same G value (horizontal) or same O value (vertical)
       const segs=[];
       for(let i=0;i<marks.length;i++){
         for(let j=i+1;j<marks.length;j++){
@@ -531,18 +596,33 @@ function RoseSVG({marks,onPlace,linked,hover,setHover,lang}){
             const[ax,ay]=toSvg(a.g,a.o);
             const[bx,by]=toSvg(b.g,b.o);
             segs.push(e('line',{key:`seg${i}-${j}`,x1:ax,y1:ay,x2:bx,y2:by,
-              stroke:CORAL,strokeWidth:2.5,strokeDasharray:"5,3",opacity:0.85}));
+              stroke:CORAL,strokeWidth:2,strokeDasharray:"5,3",opacity:0.7}));
           }
         }
       }
       return segs;
     })():[]),
+
+    /* ── ghost mark at snap point ── */
+    ghostSvg&&!ghostAlreadyPlaced?e('circle',{
+      cx:ghostSvg[0],cy:ghostSvg[1],r:10,
+      fill:CORAL,opacity:0.25,stroke:CORAL,strokeWidth:1.5,strokeDasharray:"3,2"
+    }):null,
+    ghostSvg&&ghostAlreadyPlaced?e('circle',{
+      cx:ghostSvg[0],cy:ghostSvg[1],r:12,
+      fill:"none",stroke:CORAL,strokeWidth:1.5,opacity:0.4,strokeDasharray:"3,2"
+    }):null,
+
+    /* ── placed marks — plain dots, no numbers ── */
     ...marks.map((m,i)=>{
       const[sx,sy]=toSvg(m.g,m.o);
+      const isHovered=hover===i;
       return e('g',{key:i},
-        hover===i?e('circle',{cx:sx,cy:sy,r:18,fill:CORAL,opacity:0.18}):null,
-        e('circle',{cx:sx,cy:sy,r:11,fill:CORAL,stroke:"white",strokeWidth:2.5}),
-        e('text',{x:sx,y:sy+4,fill:"white",fontSize:10,fontWeight:"700",textAnchor:"middle"},String(i+1))
+        isHovered?e('circle',{cx:sx,cy:sy,r:16,fill:CORAL,opacity:0.15}):null,
+        e('circle',{cx:sx,cy:sy,r:9,fill:CORAL,stroke:"white",strokeWidth:2}),
+        // small X on hover to signal "tap to remove"
+        isHovered?e('text',{x:sx,y:sy+4,fill:"white",fontSize:10,fontWeight:"bold",
+          textAnchor:"middle",fontFamily:"sans-serif"},"×"):null
       );
     })
   );
@@ -555,7 +635,7 @@ const Btn=(bg,fg,ex={})=>({background:bg,color:fg,border:"none",borderRadius:10,
   padding:"11px 20px",fontSize:14,cursor:"pointer",fontFamily:"sans-serif",...ex});
 
 function App(){
-  const[lang,setLang]=useState("en");
+  const[lang,setLang]=useState("it");
   const[phase,setPhase]=useState("intro");
   const[sex,setSex]=useState(null);
   const[genderChoice,setGenderChoice]=useState(null);
@@ -570,6 +650,7 @@ function App(){
   const[errMsg,setErrMsg]=useState("");
   const[consent,setConsent]=useState(false);
   const[guideOpen,setGuideOpen]=useState(false);
+  const[hoverPos,setHoverPos]=useState(null);
   const t=L[lang];
 
   const lastGender=t.genderOpts[t.genderOpts.length-1];
@@ -726,7 +807,12 @@ function App(){
           fontSize:14,fontWeight:"bold"}},sex)
       ),
       e('p',{style:{color:"#ccc",fontSize:12,margin:"0 0 6px"}},t.drawHint),
-      e(RoseSVG,{marks,onPlace:handlePlace,linked,hover,setHover,lang}),
+        e('div',{style:{display:"flex",gap:16,justifyContent:"center",marginBottom:6,flexWrap:"wrap"}},
+          e('span',{style:{fontSize:12,color:TEAL_D}},t.genderAxis),
+          e('span',{style:{fontSize:12,color:"#aaa"}},"|"),
+          e('span',{style:{fontSize:12,color:TEAL_D}},t.orientAxis)
+        ),
+      e(RoseSVG,{marks,onPlace:handlePlace,linked,hover,setHover,lang,hoverPos,setHoverPos}),
       e('div',{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:10,gap:8}},
         e('label',{style:{display:"flex",alignItems:"center",gap:8,cursor:"pointer",color:"#666",fontSize:13}},
           e('input',{type:"checkbox",checked:linked,
