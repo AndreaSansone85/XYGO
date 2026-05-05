@@ -21,10 +21,10 @@
 <script type="text/babel">
 const {useState} = React;
 
-/* ── WEBHOOK ────────────────────────────────────────────────── */
-const WEBHOOK = "https://script.google.com/macros/s/AKfycbyG1LfZakWS4_c-CzsyZvWQBTQB7i-uroa5VagHU6mFnjW1Og4BHaF1ZeY4S8gjDIyq/exec";
+/* ── WEBHOOK ─────────────────────────────────────────────────── */
+const WEBHOOK = "https://script.google.com/macros/s/AKfycbw_NZ-ov4rhQR-JIA8VBf109INf9n4oM-rir7qNpfQ/exec";
 
-/* ── PALETTE ────────────────────────────────────────────────── */
+/* ── PALETTE ─────────────────────────────────────────────────── */
 const T  = "#4da8a4";
 const TL = "#8dcfcc";
 const TP = "#d6efee";
@@ -32,14 +32,13 @@ const TD = "#2a8c88";
 const CR = "#e05c5c";
 const BG = "#f0f5f5";
 
-/* ── HELPERS ────────────────────────────────────────────────── */
+/* ── CONSTANTS ───────────────────────────────────────────────── */
+const SZ = 320, CX = 160, CY = 160, U = 32;
+const PTS = [-3, -2, -1, 0, 1, 2, 3];
+
+/* ── HELPERS ─────────────────────────────────────────────────── */
 const fmt = v => v > 0 ? `+${v}` : `${v}`;
 
-/*
- * gVals / oVals : arrays of selected integers (–3 to +3)
- * fluidG / fluidO : if true AND >1 value on that axis,
- *   notation uses range min:max; otherwise lists all values comma-separated
- */
 function buildNotation(sex, gVals, fluidG, oVals, fluidO) {
   if (!sex || gVals.length === 0 || oVals.length === 0) return "";
   const sg = [...gVals].sort((a, b) => a - b);
@@ -53,7 +52,6 @@ function buildNotation(sex, gVals, fluidG, oVals, fluidO) {
   return `${sex}; ${gStr}; ${oStr}`;
 }
 
-/* Smooth petal path */
 function petalPath(cx, cy, tx, ty, w) {
   const dx = tx - cx, dy = ty - cy;
   const len = Math.sqrt(dx * dx + dy * dy);
@@ -63,7 +61,7 @@ function petalPath(cx, cy, tx, ty, w) {
   return `M ${cx} ${cy} Q ${mx+px} ${my+py} ${tx} ${ty} Q ${mx-px} ${my-py} ${cx} ${cy} Z`;
 }
 
-/* ── TRANSLATIONS ───────────────────────────────────────────── */
+/* ── TRANSLATIONS ────────────────────────────────────────────── */
 const L = {
   en: {
     roseTitle:"XYGO", roseSub:"WIND ROSE",
@@ -92,20 +90,18 @@ const L = {
     genderOpts:["Cisgender","Transgender","Agender","Genderless","Pangender","Gender fluid","Other\u2026"],
     orientOpts:["Heterosexual","Homosexual","Asexual","Pansexual","Bisexual","Other\u2026"],
     otherPh:"Please specify\u2026",
-    drawTitle:"Your XYGO Profile",
     genderScaleTitle:"Gender Identity",
-    genderDesc:"Gender identity is a person\u2019s deeply held internal sense of their own gender. It may or may not align with the sex assigned at birth. Tap one or more points on the scale below.",
+    genderDesc:"Gender identity is a person\u2019s deeply held internal sense of their own gender. It may or may not align with the sex assigned at birth. Tap one or more points on the vertical scale.",
     genderLeft:"Perceived gender: male",
     genderRight:"Perceived gender: female",
     fluidLabel:"My gender identity is fluid",
-    fluidHint:"When checked, your selected points are shown as a continuous range on the compass.",
+    fluidHint:"When checked, your selected points are shown as a continuous range.",
     orientScaleTitle:"Sexual Orientation",
-    orientDesc:"Sexual orientation refers to the enduring pattern of emotional, romantic, and/or sexual attraction one feels toward others. Tap one or more points on the scale below.",
+    orientDesc:"Sexual orientation refers to the enduring pattern of emotional, romantic, and/or sexual attraction one feels toward others. Tap one or more points on the horizontal scale.",
     orientLeft:"Sexual orientation: other sex",
     orientRight:"Sexual orientation: same sex",
     orientFluidLabel:"My sexual orientation is fluid",
-    orientFluidHint:"When checked, your selected points are shown as a continuous range on the compass.",
-    previewTitle:"Your position on the XYGO compass",
+    orientFluidHint:"When checked, your selected points are shown as a continuous range.",
     notLbl:"Notation:",
     submit:"Submit \u2713", saving:"Sending\u2026",
     errMsg:"Could not send. Please check your connection.",
@@ -114,6 +110,7 @@ const L = {
     doneLabel:"Your XYGO notation",
     newResp:"New response",
     female:"Female", male:"Male", same:"Same sex", other:"Other sex",
+    step:"Step", of:"of",
   },
   it: {
     roseTitle:"XYGO", roseSub:"ROSA DEI VENTI",
@@ -142,20 +139,18 @@ const L = {
     genderOpts:["Cisgender","Transgender","Agender","Senza genere","Pangender","Gender fluid","Altro\u2026"],
     orientOpts:["Eterosessuale","Omosessuale","Asessuale","Pansessuale","Bisessuale","Altro\u2026"],
     otherPh:"Specifica\u2026",
-    drawTitle:"Il tuo profilo XYGO",
     genderScaleTitle:"Identit\u00e0 di genere",
-    genderDesc:"L\u2019identit\u00e0 di genere \u00e8 la percezione intima e profonda che una persona ha del proprio genere. Pu\u00f2 o meno corrispondere al sesso assegnato alla nascita. Tocca uno o pi\u00f9 punti sulla scala qui sotto.",
+    genderDesc:"L\u2019identit\u00e0 di genere \u00e8 la percezione intima e profonda che una persona ha del proprio genere. Pu\u00f2 o meno corrispondere al sesso assegnato alla nascita. Tocca uno o pi\u00f9 punti sulla scala verticale.",
     genderLeft:"Genere percepito: maschile",
     genderRight:"Genere percepito: femminile",
     fluidLabel:"La mia identit\u00e0 di genere \u00e8 fluida",
-    fluidHint:"Se selezionato, i punti scelti vengono mostrati come un intervallo continuo sulla bussola.",
+    fluidHint:"Se selezionato, i punti scelti vengono mostrati come un intervallo continuo.",
     orientScaleTitle:"Orientamento sessuale",
-    orientDesc:"L\u2019orientamento sessuale \u00e8 il pattern stabile di attrazione emotiva, romantica e/o sessuale che una persona prova verso gli altri. Tocca uno o pi\u00f9 punti sulla scala qui sotto.",
+    orientDesc:"L\u2019orientamento sessuale \u00e8 il pattern stabile di attrazione emotiva, romantica e/o sessuale che una persona prova verso gli altri. Tocca uno o pi\u00f9 punti sulla scala orizzontale.",
     orientLeft:"Orientamento sessuale: sesso opposto",
     orientRight:"Orientamento sessuale: stesso sesso",
     orientFluidLabel:"Il mio orientamento sessuale \u00e8 fluido",
-    orientFluidHint:"Se selezionato, i punti scelti vengono mostrati come un intervallo continuo sulla bussola.",
-    previewTitle:"La tua posizione nella bussola XYGO",
+    orientFluidHint:"Se selezionato, i punti scelti vengono mostrati come un intervallo continuo.",
     notLbl:"Notazione:",
     submit:"Invia \u2713", saving:"Invio in corso\u2026",
     errMsg:"Impossibile inviare. Controlla la connessione.",
@@ -164,239 +159,244 @@ const L = {
     doneLabel:"La tua notazione XYGO",
     newResp:"Nuova risposta",
     female:"Femminile", male:"Maschile", same:"Stesso sesso", other:"Sesso opposto",
+    step:"Passo", of:"di",
   }
 };
 
-/* ── SCALE ──────────────────────────────────────────────────── */
-/*
- * vals        : number[]   — currently ticked points
- * fluid       : boolean    — when true, draws a range fill between the outermost
- *                            selected points; points are still toggled individually
- * onChange    : (vals) => void
- * leftLabel / rightLabel : endpoint descriptions
- */
-function Scale({ vals, fluid, onChange, leftLabel, rightLabel }) {
-  const PTS = [-3, -2, -1, 0, 1, 2, 3];
-  const N   = PTS.length; // 7
-
-  const toggle = (p) => {
-    const next = vals.includes(p) ? vals.filter(v => v !== p) : [...vals, p];
-    onChange(next);
-  };
-
-  /* Horizontal position [0..1] for point at index i */
-  const pct = (i) => (i / (N - 1)) * (12 / 14) + (1 / 14);
-
-  const sorted   = [...vals].sort((a, b) => a - b);
-  const hasRange = fluid && sorted.length >= 2;
-  const rangeMin = hasRange ? sorted[0]                   : null;
-  const rangeMax = hasRange ? sorted[sorted.length - 1]   : null;
-  const iMin     = hasRange ? PTS.indexOf(rangeMin)       : -1;
-  const iMax     = hasRange ? PTS.indexOf(rangeMax)       : -1;
-
+/* ── ROSE SILHOUETTE (background only) ───────────────────────── */
+function RoseBg() {
+  const petals = [
+    { d: petalPath(CX, CY, CX,      CY-3*U, 18), fill: T,  o: 0.25 },
+    { d: petalPath(CX, CY, CX,      CY+3*U, 18), fill: T,  o: 0.25 },
+    { d: petalPath(CX, CY, CX+3*U,  CY,     18), fill: T,  o: 0.25 },
+    { d: petalPath(CX, CY, CX-3*U,  CY,     18), fill: T,  o: 0.25 },
+    { d: petalPath(CX, CY, CX+3*U,  CY-3*U, 12), fill: TL, o: 0.18 },
+    { d: petalPath(CX, CY, CX-3*U,  CY-3*U, 12), fill: TL, o: 0.18 },
+    { d: petalPath(CX, CY, CX+3*U,  CY+3*U, 12), fill: TL, o: 0.18 },
+    { d: petalPath(CX, CY, CX-3*U,  CY+3*U, 12), fill: TL, o: 0.18 },
+  ];
   return (
-    <div style={{ width: "100%" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-        <span style={{ fontSize: 11, color: "#8aabaa", maxWidth: "43%", lineHeight: 1.35, fontWeight: 500 }}>
-          {leftLabel}
-        </span>
-        <span style={{ fontSize: 11, color: "#8aabaa", maxWidth: "43%", textAlign: "right", lineHeight: 1.35, fontWeight: 500 }}>
-          {rightLabel}
-        </span>
-      </div>
-
-      <div style={{ position: "relative", height: 48, display: "flex", alignItems: "center" }}>
-        {/* Base track */}
-        <div style={{
-          position: "absolute",
-          left:  `calc(${pct(0) * 100}%)`,
-          right: `calc(${(1 - pct(N - 1)) * 100}%)`,
-          height: 3, background: "#ddeeed", borderRadius: 3
-        }}/>
-
-        {/* Fluid range fill between outermost selected points */}
-        {hasRange && (
-          <div style={{
-            position: "absolute",
-            left:  `calc(${pct(iMin) * 100}%)`,
-            right: `calc(${(1 - pct(iMax)) * 100}%)`,
-            height: 3, background: TD, borderRadius: 3, zIndex: 1
-          }}/>
-        )}
-
-        {/* 7 individually toggleable points */}
-        {PTS.map((p, i) => {
-          const selected = vals.includes(p);
-          const inRange  = hasRange && p > rangeMin && p < rangeMax;
-          return (
-            <div key={p}
-              onPointerDown={() => toggle(p)}
-              style={{
-                position: "absolute",
-                left: `calc(${pct(i) * 100}%)`,
-                transform: "translateX(-50%)",
-                width: 38, height: 38, borderRadius: "50%",
-                background: selected ? TD : inRange ? TL : "white",
-                border: `2.5px solid ${selected ? TD : inRange ? TL : "#d4e8e7"}`,
-                cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 11, fontWeight: "600",
-                color: selected ? "white" : inRange ? TD : "#9ab",
-                zIndex: 3,
-                transition: "background 0.12s, border-color 0.12s",
-                userSelect: "none", WebkitUserSelect: "none",
-                boxShadow: selected
-                  ? "0 3px 12px rgba(42,140,136,0.28)"
-                  : "0 1px 4px rgba(0,0,0,0.06)",
-                touchAction: "manipulation"
-              }}>
-              {p === 0 ? "0" : p > 0 ? `+${p}` : p}
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    <g>
+      <circle cx={CX} cy={CY} r={3*U + 14} fill={TP} opacity={0.38}/>
+      {petals.map((p, i) => <path key={i} d={p.d} fill={p.fill} opacity={p.o}/>)}
+      {/* Faint axis guides */}
+      <line x1={CX-3*U} y1={CY} x2={CX+3*U} y2={CY} stroke={TL} strokeWidth={1} opacity={0.30}/>
+      <line x1={CX} y1={CY-3*U} x2={CX} y2={CY+3*U} stroke={TL} strokeWidth={1} opacity={0.30}/>
+    </g>
   );
 }
 
-/* ── WIND ROSE PREVIEW ──────────────────────────────────────── */
+/* ── GENDER SCALE SVG (vertical, interactive) ────────────────── */
 /*
- * The X-axis labels ("Same sex" / "Other sex") are rotated –90°
- * so they read vertically and do not overlap the petals.
- *
- * X axis = sexual orientation (–3 other sex … +3 same sex)
- * Y axis = gender identity    (–3 male     … +3 female)
- *
- * User markers: dots at every (gVal, oVal) combination.
- * If fluidG and >1 G value: vertical line for each selected O.
- * If fluidO and >1 O value: horizontal line for each selected G.
+ * Y axis: +3 female at top (y = CY - 3U), -3 male at bottom (y = CY + 3U)
+ * Points are toggled individually; fluid fills a line between outermost selected.
  */
-function RosePreview({ gVals, fluidG, oVals, fluidO, t }) {
-  const SZ = 310, CX = 155, CY = 155, U = 34;
+function GenderScaleSVG({ vals, fluid, onChange, t }) {
+  const toggle = p => onChange(vals.includes(p) ? vals.filter(v => v !== p) : [...vals, p]);
 
-  const petals = [
-    { d: petalPath(CX, CY, CX,      CY-3*U, 19), fill: T,  o: 0.72 }, // N – female
-    { d: petalPath(CX, CY, CX,      CY+3*U, 19), fill: T,  o: 0.72 }, // S – male
-    { d: petalPath(CX, CY, CX+3*U,  CY,     19), fill: T,  o: 0.72 }, // E – same sex
-    { d: petalPath(CX, CY, CX-3*U,  CY,     19), fill: T,  o: 0.72 }, // W – other sex
-    { d: petalPath(CX, CY, CX+3*U,  CY-3*U, 13), fill: TL, o: 0.55 }, // NE
-    { d: petalPath(CX, CY, CX-3*U,  CY-3*U, 13), fill: TL, o: 0.55 }, // NW
-    { d: petalPath(CX, CY, CX+3*U,  CY+3*U, 13), fill: TL, o: 0.55 }, // SE
-    { d: petalPath(CX, CY, CX-3*U,  CY+3*U, 13), fill: TL, o: 0.55 }, // SW
-  ];
+  const sorted   = [...vals].sort((a, b) => a - b);
+  const hasRange = fluid && sorted.length >= 2;
+  const rMin     = hasRange ? sorted[0]                   : null;
+  const rMax     = hasRange ? sorted[sorted.length - 1]   : null;
 
-  const gridDots = [];
-  for (let g = -3; g <= 3; g++)
-    for (let o = -3; o <= 3; o++)
-      gridDots.push({ x: CX + o * U, y: CY - g * U });
-
-  const hasAny  = gVals.length > 0 && oVals.length > 0;
-  const sg      = [...gVals].sort((a, b) => a - b);
-  const so      = [...oVals].sort((a, b) => a - b);
-  const useGLn  = fluidG && sg.length > 1;
-  const useOLn  = fluidO && so.length > 1;
-  const combos  = [];
-  for (const g of gVals) for (const o of oVals) combos.push({ g, o });
-
-  /* X-axis label positions — placed just inside the SVG edges, rotated */
-  const XLBL_R = SZ - 9;  // "Same sex"  column
-  const XLBL_L = 9;       // "Other sex" column
+  /* y-coordinate of point p */
+  const py = p => CY - p * U;
 
   return (
     <svg width="100%" viewBox={`0 0 ${SZ} ${SZ}`}
-      style={{ display: "block", margin: "0 auto", maxWidth: SZ }}>
+      style={{ display: "block", margin: "0 auto", maxWidth: SZ, touchAction: "none" }}>
 
-      {/* Background circle */}
-      <circle cx={CX} cy={CY} r={3*U + 14} fill={TP} opacity={0.50}/>
+      <RoseBg/>
 
-      {/* Petals */}
-      {petals.map((p, i) => <path key={i} d={p.d} fill={p.fill} opacity={p.o}/>)}
+      {/* Track — vertical centre line */}
+      <line x1={CX} y1={py(3)} x2={CX} y2={py(-3)}
+        stroke="#ddeeed" strokeWidth={4} strokeLinecap="round"/>
 
-      {/* Grid lines (subtle) */}
-      {[-3,-2,-1,1,2,3].map(v => (
-        <g key={v} opacity={0.12}>
-          <line x1={CX+v*U} y1={CY-3*U} x2={CX+v*U} y2={CY+3*U} stroke="#4a7a78" strokeWidth={1}/>
-          <line x1={CX-3*U} y1={CY-v*U} x2={CX+3*U} y2={CY-v*U} stroke="#4a7a78" strokeWidth={1}/>
-        </g>
-      ))}
+      {/* Fluid range fill */}
+      {hasRange && (
+        <line x1={CX} y1={py(rMax)} x2={CX} y2={py(rMin)}
+          stroke={TD} strokeWidth={4} strokeLinecap="round" opacity={0.85}/>
+      )}
 
-      {/* Main axes */}
-      <line x1={CX-3*U} y1={CY} x2={CX+3*U} y2={CY} stroke="rgba(255,255,255,0.65)" strokeWidth={1.5}/>
-      <line x1={CX} y1={CY-3*U} x2={CX} y2={CY+3*U} stroke="rgba(255,255,255,0.65)" strokeWidth={1.5}/>
-
-      {/* Grid dots */}
-      {gridDots.map((d, i) => <circle key={i} cx={d.x} cy={d.y} r={2.2} fill="white" opacity={0.45}/>)}
-
-      {/* Centre dot */}
-      <circle cx={CX} cy={CY} r={4} fill="white" opacity={0.85}/>
-
-      {/* ── Y-axis labels (horizontal, above and below) ── */}
-      <text x={CX} y={CY - 3*U - 13}
+      {/* Y-axis labels — kept clear of the r=16 interactive circles */}
+      <text x={CX} y={py(3) - 26}
         textAnchor="middle" dominantBaseline="auto"
-        fill={TD} fontSize={11} fontFamily="DM Sans" fontWeight="600">
+        fill={TD} fontSize={12} fontFamily="DM Sans" fontWeight="600">
         {t.female}
       </text>
-      <text x={CX} y={CY + 3*U + 19}
+      <text x={CX} y={py(-3) + 34}
         textAnchor="middle" dominantBaseline="auto"
-        fill={TD} fontSize={11} fontFamily="DM Sans" fontWeight="600">
+        fill={TD} fontSize={12} fontFamily="DM Sans" fontWeight="600">
         {t.male}
       </text>
 
-      {/* ── X-axis labels (VERTICAL — rotated –90° around their anchor) ── */}
-      {/* "Same sex" on the right */}
-      <text
-        x={XLBL_R} y={CY}
+      {/* 7 interactive points */}
+      {PTS.map(p => {
+        const selected = vals.includes(p);
+        const inRange  = hasRange && p > rMin && p < rMax;
+        return (
+          <g key={p} onPointerDown={() => toggle(p)} style={{ cursor: "pointer" }}>
+            {/* Enlarged transparent hit area for mobile */}
+            <circle cx={CX} cy={py(p)} r={22} fill="transparent"/>
+            {/* Visual circle */}
+            <circle cx={CX} cy={py(p)} r={16}
+              fill={selected ? TD : inRange ? TL : "white"}
+              stroke={selected ? TD : inRange ? TL : "#d4e8e7"}
+              strokeWidth={2.5}
+              style={{ filter: selected ? "drop-shadow(0 2px 6px rgba(42,140,136,0.35))" : "none" }}
+            />
+            {/* Label */}
+            <text cx={CX} x={CX} y={py(p)} textAnchor="middle" dominantBaseline="middle"
+              fontSize={10} fontFamily="DM Sans" fontWeight="700"
+              fill={selected ? "white" : inRange ? TD : "#aabcbb"}
+              style={{ pointerEvents: "none" }}>
+              {p === 0 ? "0" : p > 0 ? `+${p}` : `${p}`}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/* ── ORIENTATION SCALE SVG (horizontal, interactive) ─────────── */
+/*
+ * X axis: -3 other sex at left (x = CX - 3U), +3 same sex at right (x = CX + 3U)
+ * G markers (from previous step) shown as read-only coral dots on Y axis.
+ */
+function OrientScaleSVG({ gVals, fluidG, vals, fluid, onChange, t }) {
+  const toggle = p => onChange(vals.includes(p) ? vals.filter(v => v !== p) : [...vals, p]);
+
+  const sorted   = [...vals].sort((a, b) => a - b);
+  const hasRange = fluid && sorted.length >= 2;
+  const rMin     = hasRange ? sorted[0]                   : null;
+  const rMax     = hasRange ? sorted[sorted.length - 1]   : null;
+
+  const sg       = [...gVals].sort((a, b) => a - b);
+  const gRange   = fluidG && sg.length >= 2;
+
+  /* x-coordinate of point p */
+  const px = p => CX + p * U;
+  /* y-coordinate of gender point g */
+  const gy = g => CY - g * U;
+
+  /* X-axis label columns (rotated) */
+  const XLBL_R = SZ - 9;
+  const XLBL_L = 9;
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${SZ} ${SZ}`}
+      style={{ display: "block", margin: "0 auto", maxWidth: SZ, touchAction: "none" }}>
+
+      <RoseBg/>
+
+      {/* ── Gender markers (read-only) ── */}
+      {/* Fluid range line on Y axis */}
+      {gRange && (
+        <line x1={CX} y1={gy(sg[0])} x2={CX} y2={gy(sg[sg.length - 1])}
+          stroke={CR} strokeWidth={4} strokeLinecap="round" opacity={0.65}/>
+      )}
+      {/* Dot for each selected G value */}
+      {gVals.map(g => (
+        <circle key={g} cx={CX} cy={gy(g)} r={9}
+          fill={CR} stroke="white" strokeWidth={2} opacity={0.88}/>
+      ))}
+      {/* Faint Y-axis labels for context — centred at CX, same alignment as gender scale */}
+      <text x={CX} y={gy(3) - 24}
+        textAnchor="middle" dominantBaseline="auto"
+        fill={TD} fontSize={10} fontFamily="DM Sans" fontWeight="600" opacity={0.55}>
+        {t.female}
+      </text>
+      <text x={CX} y={gy(-3) + 32}
+        textAnchor="middle" dominantBaseline="auto"
+        fill={TD} fontSize={10} fontFamily="DM Sans" fontWeight="600" opacity={0.55}>
+        {t.male}
+      </text>
+
+      {/* ── Orientation track ── */}
+      <line x1={px(-3)} y1={CY} x2={px(3)} y2={CY}
+        stroke="#ddeeed" strokeWidth={4} strokeLinecap="round"/>
+
+      {/* Fluid range fill */}
+      {hasRange && (
+        <line x1={px(rMin)} y1={CY} x2={px(rMax)} y2={CY}
+          stroke={TD} strokeWidth={4} strokeLinecap="round" opacity={0.85}/>
+      )}
+
+      {/* X-axis labels — vertical (rotated) */}
+      <text x={XLBL_R} y={CY}
         textAnchor="middle" dominantBaseline="middle"
         transform={`rotate(-90, ${XLBL_R}, ${CY})`}
         fill={TD} fontSize={11} fontFamily="DM Sans" fontWeight="600">
         {t.same}
       </text>
-      {/* "Other sex" on the left */}
-      <text
-        x={XLBL_L} y={CY}
+      <text x={XLBL_L} y={CY}
         textAnchor="middle" dominantBaseline="middle"
         transform={`rotate(-90, ${XLBL_L}, ${CY})`}
         fill={TD} fontSize={11} fontFamily="DM Sans" fontWeight="600">
         {t.other}
       </text>
 
-      {/* ── User markers ── */}
-      {hasAny && <>
-        {/* Fluid-G: vertical line from min_G to max_G for each selected O */}
-        {useGLn && oVals.map(o => (
-          <line key={`fg${o}`}
-            x1={CX + o*U} y1={CY - sg[0]*U}
-            x2={CX + o*U} y2={CY - sg[sg.length-1]*U}
-            stroke={CR} strokeWidth={3.5} strokeLinecap="round" opacity={0.70}/>
-        ))}
-        {/* Fluid-O: horizontal line from min_O to max_O for each selected G */}
-        {useOLn && gVals.map(g => (
-          <line key={`fo${g}`}
-            x1={CX + so[0]*U} y1={CY - g*U}
-            x2={CX + so[so.length-1]*U} y2={CY - g*U}
-            stroke={CR} strokeWidth={3.5} strokeLinecap="round" opacity={0.70}/>
-        ))}
-        {/* Dashed crosshairs only when exactly one combo */}
-        {combos.length === 1 && (() => {
-          const {g, o} = combos[0];
-          return <>
-            <line x1={CX+o*U} y1={CY} x2={CX+o*U} y2={CY-g*U}
-              stroke={CR} strokeWidth={1} strokeDasharray="3 3" opacity={0.32}/>
-            <line x1={CX} y1={CY-g*U} x2={CX+o*U} y2={CY-g*U}
-              stroke={CR} strokeWidth={1} strokeDasharray="3 3" opacity={0.32}/>
-          </>;
-        })()}
-        {/* Dot at every (g, o) combination */}
-        {combos.map(({g, o}, i) => (
-          <circle key={i} cx={CX+o*U} cy={CY-g*U}
-            r={8} fill={CR} stroke="white" strokeWidth={2.2} opacity={0.90}/>
-        ))}
-      </>}
+      {/* 7 interactive points */}
+      {PTS.map(p => {
+        const selected = vals.includes(p);
+        const inRange  = hasRange && p > rMin && p < rMax;
+        return (
+          <g key={p} onPointerDown={() => toggle(p)} style={{ cursor: "pointer" }}>
+            <circle cx={px(p)} cy={CY} r={22} fill="transparent"/>
+            <circle cx={px(p)} cy={CY} r={16}
+              fill={selected ? TD : inRange ? TL : "white"}
+              stroke={selected ? TD : inRange ? TL : "#d4e8e7"}
+              strokeWidth={2.5}
+              style={{ filter: selected ? "drop-shadow(0 2px 6px rgba(42,140,136,0.35))" : "none" }}
+            />
+            <text x={px(p)} y={CY} textAnchor="middle" dominantBaseline="middle"
+              fontSize={10} fontFamily="DM Sans" fontWeight="700"
+              fill={selected ? "white" : inRange ? TD : "#aabcbb"}
+              style={{ pointerEvents: "none" }}>
+              {p === 0 ? "0" : p > 0 ? `+${p}` : `${p}`}
+            </text>
+          </g>
+        );
+      })}
     </svg>
   );
 }
 
-/* ── SHARED UI ──────────────────────────────────────────────── */
+/* ── REUSABLE COMPONENTS ─────────────────────────────────────── */
+function FluidBox({ checked, onChange, label, hint }) {
+  return (
+    <div style={{ marginTop: 14 }}>
+      <label style={{ display: "flex", alignItems: "flex-start", gap: 9, cursor: "pointer" }}>
+        <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)}
+          style={{ marginTop: 2, accentColor: TD, width: 16, height: 16, flexShrink: 0 }}/>
+        <span style={{ fontSize: 13, color: "#6a8a89", lineHeight: 1.45 }}>{label}</span>
+      </label>
+      {checked && (
+        <p style={{ fontSize: 11, color: T, marginTop: 6, lineHeight: 1.5, fontStyle: "italic", paddingLeft: 25 }}>
+          {hint}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function StepDots({ current, total }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 20 }}>
+      {Array.from({ length: total }).map((_, i) => (
+        <div key={i} style={{
+          width: i === current ? 20 : 7, height: 7,
+          borderRadius: 4,
+          background: i < current ? TL : i === current ? TD : "#d4e8e7",
+          transition: "all 0.25s"
+        }}/>
+      ))}
+    </div>
+  );
+}
+
+/* ── SHARED STYLES ───────────────────────────────────────────── */
 const wrap = {
   fontFamily: "'DM Sans', sans-serif",
   minHeight: "100vh", background: BG,
@@ -406,7 +406,7 @@ const wrap = {
 };
 const card = {
   background: "white", borderRadius: 18,
-  padding: "26px 22px",
+  padding: "24px 20px",
   boxShadow: "0 2px 24px rgba(0,0,0,0.07)",
   width: "100%", maxWidth: 480, marginBottom: 14
 };
@@ -418,25 +418,10 @@ const Btn = (bg, fg, ex = {}) => ({
   transition: "opacity 0.15s", ...ex
 });
 
-/* Reusable fluid checkbox with optional hint */
-function FluidBox({ checked, onChange, label, hint }) {
-  return (
-    <div style={{ marginTop: 14 }}>
-      <label style={{ display: "flex", alignItems: "flex-start", gap: 9, cursor: "pointer" }}>
-        <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)}
-          style={{ marginTop: 2, accentColor: TD, width: 15, height: 15, flexShrink: 0 }}/>
-        <span style={{ fontSize: 13, color: "#6a8a89", lineHeight: 1.45 }}>{label}</span>
-      </label>
-      {checked && (
-        <p style={{ fontSize: 11, color: T, marginTop: 6, lineHeight: 1.5, fontStyle: "italic", paddingLeft: 24 }}>
-          {hint}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/* ── APP ────────────────────────────────────────────────────── */
+/* ── APP ─────────────────────────────────────────────────────── */
+/*
+ * Phases: intro → sex → identity → drawG → drawO → done
+ */
 function App() {
   const [lang,      setLang]      = useState("it");
   const [phase,     setPhase]     = useState("intro");
@@ -447,14 +432,12 @@ function App() {
   const [genderOth, setGenderOth] = useState("");
   const [orientLbl, setOrientLbl] = useState("");
   const [orientOth, setOrientOth] = useState("");
-  /* scales */
-  const [gVals,  setGVals]  = useState([]);
-  const [fluidG, setFluidG] = useState(false);
-  const [oVals,  setOVals]  = useState([]);
-  const [fluidO, setFluidO] = useState(false);
-  /* submission */
-  const [busy,   setBusy]   = useState(false);
-  const [errMsg, setErrMsg] = useState("");
+  const [gVals,     setGVals]     = useState([]);
+  const [fluidG,    setFluidG]    = useState(false);
+  const [oVals,     setOVals]     = useState([]);
+  const [fluidO,    setFluidO]    = useState(false);
+  const [busy,      setBusy]      = useState(false);
+  const [errMsg,    setErrMsg]    = useState("");
 
   const t = L[lang];
 
@@ -519,7 +502,7 @@ function App() {
     </div>
   );
 
-  /* ── INTRO ────────────────────────────────────────────────── */
+  /* ─── INTRO ─────────────────────────────────────────────────── */
   if (phase === "intro") return (
     <div style={wrap}>
       <LangToggle/>
@@ -555,11 +538,12 @@ function App() {
     </div>
   );
 
-  /* ── SEX ──────────────────────────────────────────────────── */
+  /* ─── SEX ───────────────────────────────────────────────────── */
   if (phase === "sex") return (
     <div style={wrap}>
       <LangToggle/>
       <div style={card}>
+        <StepDots current={0} total={5}/>
         <h2 style={{ fontFamily: "'DM Serif Display', serif", color: TD, fontSize: 22, marginBottom: 6 }}>
           {t.sexTitle}
         </h2>
@@ -597,7 +581,7 @@ function App() {
     </div>
   );
 
-  /* ── IDENTITY ─────────────────────────────────────────────── */
+  /* ─── IDENTITY ──────────────────────────────────────────────── */
   if (phase === "identity") {
     const optBtn = (label, selected, onClick) => (
       <button key={label} onClick={onClick} style={{
@@ -618,9 +602,11 @@ function App() {
       <div style={wrap}>
         <LangToggle/>
         <div style={card}>
+          <StepDots current={1} total={5}/>
           <h2 style={{ fontFamily: "'DM Serif Display', serif", color: TD, fontSize: 22, marginBottom: 20 }}>
             {t.identityTitle}
           </h2>
+          {/* Age */}
           <div style={{ marginBottom: 22 }}>
             <label style={{ fontSize: 13, color: "#6a8a89", fontWeight: "600", display: "block", marginBottom: 8 }}>
               {t.ageQ}
@@ -633,6 +619,7 @@ function App() {
                 fontSize: 14, outline: "none", fontFamily: "'DM Sans', sans-serif", color: "#333"
               }}/>
           </div>
+          {/* Gender label */}
           <div style={{ marginBottom: 22 }}>
             <label style={{ fontSize: 13, color: "#6a8a89", fontWeight: "600", display: "block", marginBottom: 10 }}>
               {t.genderQ}
@@ -648,6 +635,7 @@ function App() {
                 }}/>
             )}
           </div>
+          {/* Orientation label */}
           <div style={{ marginBottom: 24 }}>
             <label style={{ fontSize: 13, color: "#6a8a89", fontWeight: "600", display: "block", marginBottom: 10 }}>
               {t.orientQ}
@@ -666,7 +654,7 @@ function App() {
           <div style={{ display: "flex", gap: 10 }}>
             <button onClick={() => setPhase("sex")}
               style={Btn("white", "#8aabaa", { border: "1.5px solid #d4e8e7", flex: 1 })}>{t.back}</button>
-            <button onClick={() => setPhase("draw")} disabled={!identOk}
+            <button onClick={() => setPhase("drawG")} disabled={!identOk}
               style={Btn(identOk ? TD : "#c8dede", "white", { flex: 1 })}>{t.next}</button>
           </div>
         </div>
@@ -674,77 +662,107 @@ function App() {
     );
   }
 
-  /* ── DRAW ─────────────────────────────────────────────────── */
-  if (phase === "draw") {
-    const sHead   = { fontFamily: "'DM Serif Display', serif", color: TD, fontSize: 19, marginBottom: 6 };
-    const sDesc   = { fontSize: 13, color: "#8aabaa", lineHeight: 1.6, marginBottom: 14 };
-    const divider = { height: 1, background: "#eaf3f3", margin: "24px 0" };
-    return (
-      <div style={wrap}>
-        <LangToggle/>
-        <div style={card}>
-          <h2 style={{
-            fontFamily: "'DM Serif Display', serif",
-            color: TD, fontSize: 24, textAlign: "center", marginBottom: 24
-          }}>{t.drawTitle}</h2>
+  /* ─── DRAW G (vertical gender scale on rose) ────────────────── */
+  if (phase === "drawG") return (
+    <div style={wrap}>
+      <LangToggle/>
+      <div style={card}>
+        <StepDots current={2} total={5}/>
+        <h2 style={{
+          fontFamily: "'DM Serif Display', serif",
+          color: TD, fontSize: 22, marginBottom: 6
+        }}>{t.genderScaleTitle}</h2>
+        <p style={{ fontSize: 13, color: "#8aabaa", lineHeight: 1.6, marginBottom: 16 }}>
+          {t.genderDesc}
+        </p>
 
-          {/* Gender Identity */}
-          <section>
-            <h3 style={sHead}>{t.genderScaleTitle}</h3>
-            <p style={sDesc}>{t.genderDesc}</p>
-            <Scale vals={gVals} fluid={fluidG} onChange={setGVals}
-              leftLabel={t.genderLeft} rightLabel={t.genderRight}/>
-            <FluidBox checked={fluidG} onChange={setFluidG} label={t.fluidLabel} hint={t.fluidHint}/>
-          </section>
+        {/* Scale endpoint labels above/below the SVG for orientation */}
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, padding: "0 8px" }}>
+          <span style={{ fontSize: 11, color: "#8aabaa", fontWeight: 500 }}>{t.genderLeft}</span>
+          <span style={{ fontSize: 11, color: "#8aabaa", fontWeight: 500, textAlign: "right" }}>{t.genderRight}</span>
+        </div>
 
-          <div style={divider}/>
+        <GenderScaleSVG
+          vals={gVals} fluid={fluidG}
+          onChange={setGVals}
+          t={t}
+        />
 
-          {/* Sexual Orientation */}
-          <section>
-            <h3 style={sHead}>{t.orientScaleTitle}</h3>
-            <p style={sDesc}>{t.orientDesc}</p>
-            <Scale vals={oVals} fluid={fluidO} onChange={setOVals}
-              leftLabel={t.orientLeft} rightLabel={t.orientRight}/>
-            <FluidBox checked={fluidO} onChange={setFluidO} label={t.orientFluidLabel} hint={t.orientFluidHint}/>
-          </section>
+        <FluidBox
+          checked={fluidG}
+          onChange={v => { setFluidG(v); if (!v) setGVals(gVals); }}
+          label={t.fluidLabel}
+          hint={t.fluidHint}
+        />
 
-          <div style={divider}/>
-
-          {/* Wind Rose Preview */}
-          <section>
-            <h3 style={{ ...sHead, textAlign: "center", marginBottom: 16 }}>{t.previewTitle}</h3>
-            <RosePreview gVals={gVals} fluidG={fluidG} oVals={oVals} fluidO={fluidO} t={t}/>
-          </section>
-
-          {/* Notation */}
-          {notation && (
-            <div style={{
-              background: TP, borderRadius: 11, padding: "13px 18px",
-              textAlign: "center", marginTop: 18, border: `1px solid ${TL}`
-            }}>
-              <div style={{ fontSize: 11, color: "#8aabaa", marginBottom: 4, fontWeight: 500 }}>{t.notLbl}</div>
-              <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 22, color: TD, letterSpacing: 1 }}>
-                {notation}
-              </div>
-            </div>
-          )}
-
-          {errMsg && <p style={{ color: CR, fontSize: 13, textAlign: "center", marginTop: 12 }}>{errMsg}</p>}
-
-          <div style={{ display: "flex", gap: 10, marginTop: 22 }}>
-            <button onClick={() => setPhase("identity")}
-              style={Btn("white", "#8aabaa", { border: "1.5px solid #d4e8e7", flex: 1 })}>{t.back}</button>
-            <button onClick={submit} disabled={!canSubmit || busy}
-              style={Btn(canSubmit ? TD : "#c8dede", "white", { flex: 1 })}>
-              {busy ? t.saving : t.submit}
-            </button>
-          </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 22 }}>
+          <button onClick={() => setPhase("identity")}
+            style={Btn("white", "#8aabaa", { border: "1.5px solid #d4e8e7", flex: 1 })}>{t.back}</button>
+          <button onClick={() => setPhase("drawO")} disabled={gVals.length === 0}
+            style={Btn(gVals.length > 0 ? TD : "#c8dede", "white", { flex: 1 })}>{t.next}</button>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
 
-  /* ── DONE ─────────────────────────────────────────────────── */
+  /* ─── DRAW O (horizontal orientation scale on rose) ─────────── */
+  if (phase === "drawO") return (
+    <div style={wrap}>
+      <LangToggle/>
+      <div style={card}>
+        <StepDots current={3} total={5}/>
+        <h2 style={{
+          fontFamily: "'DM Serif Display', serif",
+          color: TD, fontSize: 22, marginBottom: 6
+        }}>{t.orientScaleTitle}</h2>
+        <p style={{ fontSize: 13, color: "#8aabaa", lineHeight: 1.6, marginBottom: 16 }}>
+          {t.orientDesc}
+        </p>
+
+        <OrientScaleSVG
+          gVals={gVals} fluidG={fluidG}
+          vals={oVals} fluid={fluidO}
+          onChange={setOVals}
+          t={t}
+        />
+
+        <FluidBox
+          checked={fluidO}
+          onChange={setFluidO}
+          label={t.orientFluidLabel}
+          hint={t.orientFluidHint}
+        />
+
+        {/* Notation preview */}
+        {notation && (
+          <div style={{
+            background: TP, borderRadius: 11,
+            padding: "12px 16px", textAlign: "center",
+            marginTop: 18, border: `1px solid ${TL}`
+          }}>
+            <div style={{ fontSize: 11, color: "#8aabaa", marginBottom: 4, fontWeight: 500 }}>{t.notLbl}</div>
+            <div style={{
+              fontFamily: "'DM Serif Display', serif",
+              fontSize: 22, color: TD, letterSpacing: 1
+            }}>{notation}</div>
+          </div>
+        )}
+
+        {errMsg && <p style={{ color: CR, fontSize: 13, textAlign: "center", marginTop: 12 }}>{errMsg}</p>}
+
+        <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+          <button onClick={() => setPhase("drawG")}
+            style={Btn("white", "#8aabaa", { border: "1.5px solid #d4e8e7", flex: 1 })}>{t.back}</button>
+          <button onClick={submit} disabled={!canSubmit || busy}
+            style={Btn(canSubmit ? TD : "#c8dede", "white", { flex: 1 })}>
+            {busy ? t.saving : t.submit}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* ─── DONE ──────────────────────────────────────────────────── */
   return (
     <div style={{ ...wrap, justifyContent: "center" }}>
       <div style={{ ...card, textAlign: "center", padding: "40px 28px" }}>
@@ -753,7 +771,11 @@ function App() {
           {t.doneTitle}
         </h2>
         <p style={{ color: "#9ab", fontSize: 14, marginBottom: 24 }}>{t.doneSub}</p>
-        <div style={{ background: TP, borderRadius: 12, padding: "16px 20px", marginBottom: 28, border: `1px solid ${TL}` }}>
+        <div style={{
+          background: TP, borderRadius: 12,
+          padding: "16px 20px", marginBottom: 28,
+          border: `1px solid ${TL}`
+        }}>
           <div style={{ fontSize: 11, color: "#9ab", marginBottom: 6, fontWeight: 500 }}>{t.doneLabel}</div>
           <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 24, color: TD, letterSpacing: 1 }}>
             {notation}
