@@ -418,6 +418,156 @@ const Btn = (bg, fg, ex = {}) => ({
   transition: "opacity 0.15s", ...ex
 });
 
+/* ── DONE PLOT ───────────────────────────────────────────────── */
+/*
+ * Full wind rose with the participant's result plotted on it.
+ * X axis = sexual orientation  (–3 other sex … +3 same sex)
+ * Y axis = gender identity     (–3 male       … +3 female)
+ *
+ * Single point  → coral dot
+ * Fluid G only  → vertical segment at each selected O, dots at endpoints
+ * Fluid O only  → horizontal segment at each selected G, dots at endpoints
+ * Both fluid    → filled coral rectangle spanning the range, with corner dots
+ */
+function DonePlot({ gVals, fluidG, oVals, fluidO, t }) {
+  const DSZ = 320, DCX = 160, DCY = 160, DU = 32;
+
+  const dpy = p => DCY - p * DU;   // gender  → y
+  const dpx = p => DCX + p * DU;   // orient  → x
+
+  const sg = [...gVals].sort((a, b) => a - b);
+  const so = [...oVals].sort((a, b) => a - b);
+
+  const useGRange = fluidG && sg.length > 1;
+  const useORange = fluidO && so.length > 1;
+
+  const gMin = sg[0],            gMax = sg[sg.length - 1];
+  const oMin = so[0],            oMax = so[so.length - 1];
+
+  /* All (g, o) combos for individual dots */
+  const combos = [];
+  for (const g of gVals) for (const o of oVals) combos.push({ g, o });
+
+  /* Petal definitions reuse the same helper */
+  const petals = [
+    { d: petalPath(DCX, DCY, DCX,       DCY-3*DU, 18), fill: T,  o: 0.25 },
+    { d: petalPath(DCX, DCY, DCX,       DCY+3*DU, 18), fill: T,  o: 0.25 },
+    { d: petalPath(DCX, DCY, DCX+3*DU,  DCY,      18), fill: T,  o: 0.25 },
+    { d: petalPath(DCX, DCY, DCX-3*DU,  DCY,      18), fill: T,  o: 0.25 },
+    { d: petalPath(DCX, DCY, DCX+3*DU,  DCY-3*DU, 12), fill: TL, o: 0.18 },
+    { d: petalPath(DCX, DCY, DCX-3*DU,  DCY-3*DU, 12), fill: TL, o: 0.18 },
+    { d: petalPath(DCX, DCY, DCX+3*DU,  DCY+3*DU, 12), fill: TL, o: 0.18 },
+    { d: petalPath(DCX, DCY, DCX-3*DU,  DCY+3*DU, 12), fill: TL, o: 0.18 },
+  ];
+
+  /* Grid dots */
+  const gridDots = [];
+  for (let g = -3; g <= 3; g++)
+    for (let o = -3; o <= 3; o++)
+      gridDots.push({ x: dpx(o), y: dpy(g) });
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${DSZ} ${DSZ}`}
+      style={{ display: "block", margin: "0 auto", maxWidth: DSZ }}>
+
+      {/* Background */}
+      <circle cx={DCX} cy={DCY} r={3*DU + 14} fill={TP} opacity={0.38}/>
+
+      {/* Petals */}
+      {petals.map((p, i) => <path key={i} d={p.d} fill={p.fill} opacity={p.o}/>)}
+
+      {/* Faint grid lines */}
+      {[-3,-2,-1,1,2,3].map(v => (
+        <g key={v} opacity={0.10}>
+          <line x1={dpx(v)} y1={DCY-3*DU} x2={dpx(v)} y2={DCY+3*DU} stroke="#4a7a78" strokeWidth={1}/>
+          <line x1={DCX-3*DU} y1={dpy(v)} x2={DCX+3*DU} y2={dpy(v)} stroke="#4a7a78" strokeWidth={1}/>
+        </g>
+      ))}
+
+      {/* Grid dots */}
+      {gridDots.map((d, i) => <circle key={i} cx={d.x} cy={d.y} r={2} fill="white" opacity={0.45}/>)}
+
+      {/* Axes */}
+      <line x1={DCX-3*DU} y1={DCY} x2={DCX+3*DU} y2={DCY} stroke={TL} strokeWidth={1} opacity={0.30}/>
+      <line x1={DCX} y1={DCY-3*DU} x2={DCX} y2={DCY+3*DU} stroke={TL} strokeWidth={1} opacity={0.30}/>
+
+      {/* ── Axis labels ── */}
+      {/* Y axis — horizontal, above/below */}
+      <text x={DCX} y={dpy(3) - 26}
+        textAnchor="middle" dominantBaseline="auto"
+        fill={TD} fontSize={11} fontFamily="DM Sans" fontWeight="600">
+        {t.female}
+      </text>
+      <text x={DCX} y={dpy(-3) + 34}
+        textAnchor="middle" dominantBaseline="auto"
+        fill={TD} fontSize={11} fontFamily="DM Sans" fontWeight="600">
+        {t.male}
+      </text>
+
+      {/* X axis — vertical (rotated), left/right */}
+      <text x={DSZ - 9} y={DCY}
+        textAnchor="middle" dominantBaseline="middle"
+        transform={`rotate(-90, ${DSZ - 9}, ${DCY})`}
+        fill={TD} fontSize={11} fontFamily="DM Sans" fontWeight="600">
+        {t.same}
+      </text>
+      <text x={9} y={DCY}
+        textAnchor="middle" dominantBaseline="middle"
+        transform={`rotate(-90, 9, ${DCY})`}
+        fill={TD} fontSize={11} fontFamily="DM Sans" fontWeight="600">
+        {t.other}
+      </text>
+
+      {/* ── User result marker ── */}
+
+      {/* CASE: both fluid → filled rectangle */}
+      {useGRange && useORange && (
+        <rect
+          x={dpx(oMin)} y={dpy(gMax)}
+          width={dpx(oMax) - dpx(oMin)}
+          height={dpy(gMin) - dpy(gMax)}
+          fill={CR} opacity={0.22} rx={4}
+        />
+      )}
+
+      {/* Fluid-G lines: vertical segment for each selected O */}
+      {useGRange && so.map(o => (
+        <line key={`fg${o}`}
+          x1={dpx(o)} y1={dpy(gMin)}
+          x2={dpx(o)} y2={dpy(gMax)}
+          stroke={CR} strokeWidth={useORange ? 1.5 : 4}
+          strokeLinecap="round" opacity={0.78}/>
+      ))}
+
+      {/* Fluid-O lines: horizontal segment for each selected G */}
+      {useORange && sg.map(g => (
+        <line key={`fo${g}`}
+          x1={dpx(oMin)} y1={dpy(g)}
+          x2={dpx(oMax)} y2={dpy(g)}
+          stroke={CR} strokeWidth={useGRange ? 1.5 : 4}
+          strokeLinecap="round" opacity={0.78}/>
+      ))}
+
+      {/* Single crosshair only when exactly one point */}
+      {combos.length === 1 && (() => {
+        const { g, o } = combos[0];
+        return <>
+          <line x1={dpx(o)} y1={DCY} x2={dpx(o)} y2={dpy(g)}
+            stroke={CR} strokeWidth={1} strokeDasharray="3 3" opacity={0.35}/>
+          <line x1={DCX} y1={dpy(g)} x2={dpx(o)} y2={dpy(g)}
+            stroke={CR} strokeWidth={1} strokeDasharray="3 3" opacity={0.35}/>
+        </>;
+      })()}
+
+      {/* Coral dots at every (g, o) combination */}
+      {combos.map(({ g, o }, i) => (
+        <circle key={i} cx={dpx(o)} cy={dpy(g)}
+          r={9} fill={CR} stroke="white" strokeWidth={2.5} opacity={0.92}/>
+      ))}
+    </svg>
+  );
+}
+
 /* ── APP ─────────────────────────────────────────────────────── */
 /*
  * Phases: intro → sex → identity → drawG → drawO → done
@@ -765,15 +915,24 @@ function App() {
   /* ─── DONE ──────────────────────────────────────────────────── */
   return (
     <div style={{ ...wrap, justifyContent: "center" }}>
-      <div style={{ ...card, textAlign: "center", padding: "40px 28px" }}>
-        <div style={{ fontSize: 60, marginBottom: 14 }}>🌹</div>
-        <h2 style={{ fontFamily: "'DM Serif Display', serif", color: TD, fontSize: 28, marginBottom: 8 }}>
+      <div style={{ ...card, textAlign: "center", padding: "32px 20px 40px" }}>
+        <div style={{ fontSize: 60, marginBottom: 10 }}>🌹</div>
+        <h2 style={{ fontFamily: "'DM Serif Display', serif", color: TD, fontSize: 28, marginBottom: 6 }}>
           {t.doneTitle}
         </h2>
-        <p style={{ color: "#9ab", fontSize: 14, marginBottom: 24 }}>{t.doneSub}</p>
+        <p style={{ color: "#9ab", fontSize: 14, marginBottom: 20 }}>{t.doneSub}</p>
+
+        {/* Wind rose with plotted result */}
+        <DonePlot
+          gVals={gVals} fluidG={fluidG}
+          oVals={oVals} fluidO={fluidO}
+          t={t}
+        />
+
+        {/* Notation */}
         <div style={{
           background: TP, borderRadius: 12,
-          padding: "16px 20px", marginBottom: 28,
+          padding: "16px 20px", margin: "20px 0 28px",
           border: `1px solid ${TL}`
         }}>
           <div style={{ fontSize: 11, color: "#9ab", marginBottom: 6, fontWeight: 500 }}>{t.doneLabel}</div>
@@ -781,6 +940,7 @@ function App() {
             {notation}
           </div>
         </div>
+
         <button onClick={reset} style={Btn(TD, "white", { padding: "14px 36px", fontSize: 15 })}>
           {t.newResp}
         </button>
