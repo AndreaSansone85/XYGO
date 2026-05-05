@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+  <title>XYGO Wind Rose</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'DM Sans',sans-serif;background:#f0f5f5;min-height:100vh}
+    ::-webkit-scrollbar{width:4px}
+    ::-webkit-scrollbar-thumb{background:#b2d8d6;border-radius:2px}
+    input[type=number]::-webkit-inner-spin-button{opacity:1}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script type="text/babel">
+const {useState} = React;
+
+/* ── WEBHOOK ────────────────────────────────────────────────── */
+const WEBHOOK = "YOUR_CLOUDFLARE_WORKER_URL_HERE";
+
+/* ── PALETTE ────────────────────────────────────────────────── */
+const T  = "#4da8a4";
+const TL = "#8dcfcc";
+const TP = "#d6efee";
+const TD = "#2a8c88";
+const CR = "#e05c5c";
+const BG = "#f0f5f5";
+
+/* ── HELPERS ────────────────────────────────────────────────── */
+const fmt = v => v > 0 ? `+${v}` : `${v}`;
+
+/*
+ * gVals / oVals : arrays of selected integers (–3 to +3)
+ * fluidG / fluidO : if true AND >1 value on that axis,
+ *   notation uses range min:max; otherwise lists all values comma-separated
+ */
+function buildNotation(sex, gVals, fluidG, oVals, fluidO) {
+  if (!sex || gVals.length === 0 || oVals.length === 0) return "";
+  const sg = [...gVals].sort((a, b) => a - b);
+  const so = [...oVals].sort((a, b) => a - b);
+  const gStr = (fluidG && sg.length > 1)
+    ? `G${fmt(sg[0])}:${fmt(sg[sg.length - 1])}`
+    : `G${sg.map(fmt).join(",")}`;
+  const oStr = (fluidO && so.length > 1)
+    ? `O${fmt(so[0])}:${fmt(so[so.length - 1])}`
+    : `O${so.map(fmt).join(",")}`;
+  return `${sex}; ${gStr}; ${oStr}`;
+}
+
+/* Smooth petal path */
+function petalPath(cx, cy, tx, ty, w) {
+  const dx = tx - cx, dy = ty - cy;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len === 0) return "";
+  const px = -dy / len * w, py = dx / len * w;
+  const mx = (cx + tx) / 2, my = (cy + ty) / 2;
+  return `M ${cx} ${cy} Q ${mx+px} ${my+py} ${tx} ${ty} Q ${mx-px} ${my-py} ${cx} ${cy} Z`;
+}
+
+/* ── TRANSLATIONS ───────────────────────────────────────────── */
+const L = {
+  en: {
+    roseTitle:"XYGO", roseSub:"WIND ROSE",
+    p1a:"Please identify yourself according to your ",
+    p1b:"assigned sex at birth",
+    p1c:", and rate your ",
+    p1d:"gender identity",
+    p1e:" and ",
+    p1f:"sexual orientation",
+    p1g:" on the compass scales.",
+    p2a:"Please refer to your feelings over the ",
+    p2b:"past 4 weeks",
+    p2c:". There are no right or wrong answers.",
+    consentText:"I have read and understood the above. I give my informed consent to participate anonymously in this study.",
+    begin:"Begin \u2192",
+    sexTitle:"Assigned sex at birth",
+    sexSub:"Select the symbol that best represents your assigned sex at birth.",
+    afab:"Assigned female\nat birth (AFAB)",
+    amab:"Assigned male\nat birth (AMAB)",
+    dsd:"Persons with DSD or aneuploid conditions may choose the symbol corresponding to their prevalent phenotype.",
+    back:"\u2190 Back", next:"Next \u2192",
+    identityTitle:"About you",
+    ageQ:"Age",
+    genderQ:"How do you identify your gender?",
+    orientQ:"How do you define your sexual orientation?",
+    genderOpts:["Cisgender","Transgender","Agender","Genderless","Pangender","Gender fluid","Other\u2026"],
+    orientOpts:["Heterosexual","Homosexual","Asexual","Pansexual","Bisexual","Other\u2026"],
+    otherPh:"Please specify\u2026",
+    drawTitle:"Your XYGO Profile",
+    genderScaleTitle:"Gender Identity",
+    genderDesc:"Gender identity is a person\u2019s deeply held internal sense of their own gender. It may or may not align with the sex assigned at birth. Tap one or more points on the scale below.",
+    genderLeft:"Perceived gender: male",
+    genderRight:"Perceived gender: female",
+    fluidLabel:"My gender identity is fluid",
+    fluidHint:"When checked, your selected points are shown as a continuous range on the compass.",
+    orientScaleTitle:"Sexual Orientation",
+    orientDesc:"Sexual orientation refers to the enduring pattern of emotional, romantic, and/or sexual attraction one feels toward others. Tap one or more points on the scale below.",
+    orientLeft:"Sexual orientation: other sex",
+    orientRight:"Sexual orientation: same sex",
+    orientFluidLabel:"My sexual orientation is fluid",
+    orientFluidHint:"When checked, your selected points are shown as a continuous range on the compass.",
+    previewTitle:"Your position on the XYGO compass",
+    notLbl:"Notation:",
+    submit:"Submit \u2713", saving:"Sending\u2026",
+    errMsg:"Could not send. Please check your connection.",
+    doneTitle:"Thank you!",
+    doneSub:"Your response has been recorded anonymously.",
+    doneLabel:"Your XYGO notation",
+    newResp:"New response",
+    female:"Female", male:"Male", same:"Same sex", other:"Other sex",
+  },
+  it: {
+    roseTitle:"XYGO", roseSub:"ROSA DEI VENTI",
+    p1a:"Per favore identificati in base al tuo ",
+    p1b:"sesso assegnato alla nascita",
+    p1c:", e valuta la tua ",
+    p1d:"identit\u00e0 di genere",
+    p1e:" e il tuo ",
+    p1f:"orientamento sessuale",
+    p1g:" sulle scale della bussola.",
+    p2a:"Fai riferimento alle tue percezioni nelle ",
+    p2b:"ultime 4 settimane",
+    p2c:". Non esistono risposte giuste o sbagliate.",
+    consentText:"Ho letto e compreso quanto sopra. Esprimo il mio consenso informato a partecipare anonimamente a questo studio.",
+    begin:"Inizia \u2192",
+    sexTitle:"Sesso assegnato alla nascita",
+    sexSub:"Seleziona il simbolo che meglio rappresenta il tuo sesso assegnato alla nascita.",
+    afab:"Femmina alla\nnascita (AFAB)",
+    amab:"Maschio alla\nnascita (AMAB)",
+    dsd:"Le persone con DSD o condizioni aneuploidi possono scegliere il simbolo corrispondente al fenotipo prevalente.",
+    back:"\u2190 Indietro", next:"Avanti \u2192",
+    identityTitle:"Informazioni su di te",
+    ageQ:"Et\u00e0",
+    genderQ:"Come definisci la tua identit\u00e0 di genere?",
+    orientQ:"Come definisci il tuo orientamento sessuale?",
+    genderOpts:["Cisgender","Transgender","Agender","Senza genere","Pangender","Gender fluid","Altro\u2026"],
+    orientOpts:["Eterosessuale","Omosessuale","Asessuale","Pansessuale","Bisessuale","Altro\u2026"],
+    otherPh:"Specifica\u2026",
+    drawTitle:"Il tuo profilo XYGO",
+    genderScaleTitle:"Identit\u00e0 di genere",
+    genderDesc:"L\u2019identit\u00e0 di genere \u00e8 la percezione intima e profonda che una persona ha del proprio genere. Pu\u00f2 o meno corrispondere al sesso assegnato alla nascita. Tocca uno o pi\u00f9 punti sulla scala qui sotto.",
+    genderLeft:"Genere percepito: maschile",
+    genderRight:"Genere percepito: femminile",
+    fluidLabel:"La mia identit\u00e0 di genere \u00e8 fluida",
+    fluidHint:"Se selezionato, i punti scelti vengono mostrati come un intervallo continuo sulla bussola.",
+    orientScaleTitle:"Orientamento sessuale",
+    orientDesc:"L\u2019orientamento sessuale \u00e8 il pattern stabile di attrazione emotiva, romantica e/o sessuale che una persona prova verso gli altri. Tocca uno o pi\u00f9 punti sulla scala qui sotto.",
+    orientLeft:"Orientamento sessuale: sesso opposto",
+    orientRight:"Orientamento sessuale: stesso sesso",
+    orientFluidLabel:"Il mio orientamento sessuale \u00e8 fluido",
+    orientFluidHint:"Se selezionato, i punti scelti vengono mostrati come un intervallo continuo sulla bussola.",
+    previewTitle:"La tua posizione nella bussola XYGO",
+    notLbl:"Notazione:",
+    submit:"Invia \u2713", saving:"Invio in corso\u2026",
+    errMsg:"Impossibile inviare. Controlla la connessione.",
+    doneTitle:"Grazie!",
+    doneSub:"La tua risposta \u00e8 stata registrata anonimamente.",
+    doneLabel:"La tua notazione XYGO",
+    newResp:"Nuova risposta",
+    female:"Femminile", male:"Maschile", same:"Stesso sesso", other:"Sesso opposto",
+  }
+};
+
+/* ── SCALE ──────────────────────────────────────────────────── */
+/*
+ * vals        : number[]   — currently ticked points
+ * fluid       : boolean    — when true, draws a range fill between the outermost
+ *                            selected points; points are still toggled individually
+ * onChange    : (vals) => void
+ * leftLabel / rightLabel : endpoint descriptions
+ */
+function Scale({ vals, fluid, onChange, leftLabel, rightLabel }) {
+  const PTS = [-3, -2, -1, 0, 1, 2, 3];
+  const N   = PTS.length; // 7
+
+  const toggle = (p) => {
+    const next = vals.includes(p) ? vals.filter(v => v !== p) : [...vals, p];
+    onChange(next);
+  };
+
+  /* Horizontal position [0..1] for point at index i */
+  const pct = (i) => (i / (N - 1)) * (12 / 14) + (1 / 14);
+
+  const sorted   = [...vals].sort((a, b) => a - b);
+  const hasRange = fluid && sorted.length >= 2;
+  const rangeMin = hasRange ? sorted[0]                   : null;
+  const rangeMax = hasRange ? sorted[sorted.length - 1]   : null;
+  const iMin     = hasRange ? PTS.indexOf(rangeMin)       : -1;
+  const iMax     = hasRange ? PTS.indexOf(rangeMax)       : -1;
+
+  return (
+    <div style={{ width: "100%" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+        <span style={{ fontSize: 11, color: "#8aabaa", maxWidth: "43%", lineHeight: 1.35, fontWeight: 500 }}>
+          {leftLabel}
+        </span>
+        <span style={{ fontSize: 11, color: "#8aabaa", maxWidth: "43%", textAlign: "right", lineHeight: 1.35, fontWeight: 500 }}>
+          {rightLabel}
+        </span>
+      </div>
+
+      <div style={{ position: "relative", height: 48, display: "flex", alignItems: "center" }}>
+        {/* Base track */}
+        <div style={{
+          position: "absolute",
+          left:  `calc(${pct(0) * 100}%)`,
+          right: `calc(${(1 - pct(N - 1)) * 100}%)`,
+          height: 3, background: "#ddeeed", borderRadius: 3
+        }}/>
+
+        {/* Fluid range fill between outermost selected points */}
+        {hasRange && (
+          <div style={{
+            position: "absolute",
+            left:  `calc(${pct(iMin) * 100}%)`,
+            right: `calc(${(1 - pct(iMax)) * 100}%)`,
+            height: 3, background: TD, borderRadius: 3, zIndex: 1
+          }}/>
+        )}
+
+        {/* 7 individually toggleable points */}
+        {PTS.map((p, i) => {
+          const selected = vals.includes(p);
+          const inRange  = hasRange && p > rangeMin && p < rangeMax;
+          return (
+            <div key={p}
+              onPointerDown={() => toggle(p)}
+              style={{
+                position: "absolute",
+                left: `calc(${pct(i) * 100}%)`,
+                transform: "translateX(-50%)",
+                width: 38, height: 38, borderRadius: "50%",
+                background: selected ? TD : inRange ? TL : "white",
+                border: `2.5px solid ${selected ? TD : inRange ? TL : "#d4e8e7"}`,
+                cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 11, fontWeight: "600",
+                color: selected ? "white" : inRange ? TD : "#9ab",
+                zIndex: 3,
+                transition: "background 0.12s, border-color 0.12s",
+                userSelect: "none", WebkitUserSelect: "none",
+                boxShadow: selected
+                  ? "0 3px 12px rgba(42,140,136,0.28)"
+                  : "0 1px 4px rgba(0,0,0,0.06)",
+                touchAction: "manipulation"
+              }}>
+              {p === 0 ? "0" : p > 0 ? `+${p}` : p}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ── WIND ROSE PREVIEW ──────────────────────────────────────── */
+/*
+ * The X-axis labels ("Same sex" / "Other sex") are rotated –90°
+ * so they read vertically and do not overlap the petals.
+ *
+ * X axis = sexual orientation (–3 other sex … +3 same sex)
+ * Y axis = gender identity    (–3 male     … +3 female)
+ *
+ * User markers: dots at every (gVal, oVal) combination.
+ * If fluidG and >1 G value: vertical line for each selected O.
+ * If fluidO and >1 O value: horizontal line for each selected G.
+ */
+function RosePreview({ gVals, fluidG, oVals, fluidO, t }) {
+  const SZ = 310, CX = 155, CY = 155, U = 34;
+
+  const petals = [
+    { d: petalPath(CX, CY, CX,      CY-3*U, 19), fill: T,  o: 0.72 }, // N – female
+    { d: petalPath(CX, CY, CX,      CY+3*U, 19), fill: T,  o: 0.72 }, // S – male
+    { d: petalPath(CX, CY, CX+3*U,  CY,     19), fill: T,  o: 0.72 }, // E – same sex
+    { d: petalPath(CX, CY, CX-3*U,  CY,     19), fill: T,  o: 0.72 }, // W – other sex
+    { d: petalPath(CX, CY, CX+3*U,  CY-3*U, 13), fill: TL, o: 0.55 }, // NE
+    { d: petalPath(CX, CY, CX-3*U,  CY-3*U, 13), fill: TL, o: 0.55 }, // NW
+    { d: petalPath(CX, CY, CX+3*U,  CY+3*U, 13), fill: TL, o: 0.55 }, // SE
+    { d: petalPath(CX, CY, CX-3*U,  CY+3*U, 13), fill: TL, o: 0.55 }, // SW
+  ];
+
+  const gridDots = [];
+  for (let g = -3; g <= 3; g++)
+    for (let o = -3; o <= 3; o++)
+      gridDots.push({ x: CX + o * U, y: CY - g * U });
+
+  const hasAny  = gVals.length > 0 && oVals.length > 0;
+  const sg      = [...gVals].sort((a, b) => a - b);
+  const so      = [...oVals].sort((a, b) => a - b);
+  const useGLn  = fluidG && sg.length > 1;
+  const useOLn  = fluidO && so.length > 1;
+  const combos  = [];
+  for (const g of gVals) for (const o of oVals) combos.push({ g, o });
+
+  /* X-axis label positions — placed just inside the SVG edges, rotated */
+  const XLBL_R = SZ - 9;  // "Same sex"  column
+  const XLBL_L = 9;       // "Other sex" column
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${SZ} ${SZ}`}
+      style={{ display: "block", margin: "0 auto", maxWidth: SZ }}>
+
+      {/* Background circle */}
+      <circle cx={CX} cy={CY} r={3*U + 14} fill={TP} opacity={0.50}/>
+
+      {/* Petals */}
+      {petals.map((p, i) => <path key={i} d={p.d} fill={p.fill} opacity={p.o}/>)}
+
+      {/* Grid lines (subtle) */}
+      {[-3,-2,-1,1,2,3].map(v => (
+        <g key={v} opacity={0.12}>
+          <line x1={CX+v*U} y1={CY-3*U} x2={CX+v*U} y2={CY+3*U} stroke="#4a7a78" strokeWidth={1}/>
+          <line x1={CX-3*U} y1={CY-v*U} x2={CX+3*U} y2={CY-v*U} stroke="#4a7a78" strokeWidth={1}/>
+        </g>
+      ))}
+
+      {/* Main axes */}
+      <line x1={CX-3*U} y1={CY} x2={CX+3*U} y2={CY} stroke="rgba(255,255,255,0.65)" strokeWidth={1.5}/>
+      <line x1={CX} y1={CY-3*U} x2={CX} y2={CY+3*U} stroke="rgba(255,255,255,0.65)" strokeWidth={1.5}/>
+
+      {/* Grid dots */}
+      {gridDots.map((d, i) => <circle key={i} cx={d.x} cy={d.y} r={2.2} fill="white" opacity={0.45}/>)}
+
+      {/* Centre dot */}
+      <circle cx={CX} cy={CY} r={4} fill="white" opacity={0.85}/>
+
+      {/* ── Y-axis labels (horizontal, above and below) ── */}
+      <text x={CX} y={CY - 3*U - 13}
+        textAnchor="middle" dominantBaseline="auto"
+        fill={TD} fontSize={11} fontFamily="DM Sans" fontWeight="600">
+        {t.female}
+      </text>
+      <text x={CX} y={CY + 3*U + 19}
+        textAnchor="middle" dominantBaseline="auto"
+        fill={TD} fontSize={11} fontFamily="DM Sans" fontWeight="600">
+        {t.male}
+      </text>
+
+      {/* ── X-axis labels (VERTICAL — rotated –90° around their anchor) ── */}
+      {/* "Same sex" on the right */}
+      <text
+        x={XLBL_R} y={CY}
+        textAnchor="middle" dominantBaseline="middle"
+        transform={`rotate(-90, ${XLBL_R}, ${CY})`}
+        fill={TD} fontSize={11} fontFamily="DM Sans" fontWeight="600">
+        {t.same}
+      </text>
+      {/* "Other sex" on the left */}
+      <text
+        x={XLBL_L} y={CY}
+        textAnchor="middle" dominantBaseline="middle"
+        transform={`rotate(-90, ${XLBL_L}, ${CY})`}
+        fill={TD} fontSize={11} fontFamily="DM Sans" fontWeight="600">
+        {t.other}
+      </text>
+
+      {/* ── User markers ── */}
+      {hasAny && <>
+        {/* Fluid-G: vertical line from min_G to max_G for each selected O */}
+        {useGLn && oVals.map(o => (
+          <line key={`fg${o}`}
+            x1={CX + o*U} y1={CY - sg[0]*U}
+            x2={CX + o*U} y2={CY - sg[sg.length-1]*U}
+            stroke={CR} strokeWidth={3.5} strokeLinecap="round" opacity={0.70}/>
+        ))}
+        {/* Fluid-O: horizontal line from min_O to max_O for each selected G */}
+        {useOLn && gVals.map(g => (
+          <line key={`fo${g}`}
+            x1={CX + so[0]*U} y1={CY - g*U}
+            x2={CX + so[so.length-1]*U} y2={CY - g*U}
+            stroke={CR} strokeWidth={3.5} strokeLinecap="round" opacity={0.70}/>
+        ))}
+        {/* Dashed crosshairs only when exactly one combo */}
+        {combos.length === 1 && (() => {
+          const {g, o} = combos[0];
+          return <>
+            <line x1={CX+o*U} y1={CY} x2={CX+o*U} y2={CY-g*U}
+              stroke={CR} strokeWidth={1} strokeDasharray="3 3" opacity={0.32}/>
+            <line x1={CX} y1={CY-g*U} x2={CX+o*U} y2={CY-g*U}
+              stroke={CR} strokeWidth={1} strokeDasharray="3 3" opacity={0.32}/>
+          </>;
+        })()}
+        {/* Dot at every (g, o) combination */}
+        {combos.map(({g, o}, i) => (
+          <circle key={i} cx={CX+o*U} cy={CY-g*U}
+            r={8} fill={CR} stroke="white" strokeWidth={2.2} opacity={0.90}/>
+        ))}
+      </>}
+    </svg>
+  );
+}
+
+/* ── SHARED UI ──────────────────────────────────────────────── */
+const wrap = {
+  fontFamily: "'DM Sans', sans-serif",
+  minHeight: "100vh", background: BG,
+  display: "flex", flexDirection: "column",
+  alignItems: "center", justifyContent: "flex-start",
+  padding: "20px 14px 48px"
+};
+const card = {
+  background: "white", borderRadius: 18,
+  padding: "26px 22px",
+  boxShadow: "0 2px 24px rgba(0,0,0,0.07)",
+  width: "100%", maxWidth: 480, marginBottom: 14
+};
+const Btn = (bg, fg, ex = {}) => ({
+  background: bg, color: fg, border: "none",
+  borderRadius: 10, padding: "13px 22px",
+  fontSize: 14, fontWeight: "600", cursor: "pointer",
+  fontFamily: "'DM Sans', sans-serif",
+  transition: "opacity 0.15s", ...ex
+});
+
+/* Reusable fluid checkbox with optional hint */
+function FluidBox({ checked, onChange, label, hint }) {
+  return (
+    <div style={{ marginTop: 14 }}>
+      <label style={{ display: "flex", alignItems: "flex-start", gap: 9, cursor: "pointer" }}>
+        <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)}
+          style={{ marginTop: 2, accentColor: TD, width: 15, height: 15, flexShrink: 0 }}/>
+        <span style={{ fontSize: 13, color: "#6a8a89", lineHeight: 1.45 }}>{label}</span>
+      </label>
+      {checked && (
+        <p style={{ fontSize: 11, color: T, marginTop: 6, lineHeight: 1.5, fontStyle: "italic", paddingLeft: 24 }}>
+          {hint}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ── APP ────────────────────────────────────────────────────── */
+function App() {
+  const [lang,      setLang]      = useState("it");
+  const [phase,     setPhase]     = useState("intro");
+  const [consent,   setConsent]   = useState(false);
+  const [sex,       setSex]       = useState(null);
+  const [age,       setAge]       = useState("");
+  const [genderLbl, setGenderLbl] = useState("");
+  const [genderOth, setGenderOth] = useState("");
+  const [orientLbl, setOrientLbl] = useState("");
+  const [orientOth, setOrientOth] = useState("");
+  /* scales */
+  const [gVals,  setGVals]  = useState([]);
+  const [fluidG, setFluidG] = useState(false);
+  const [oVals,  setOVals]  = useState([]);
+  const [fluidO, setFluidO] = useState(false);
+  /* submission */
+  const [busy,   setBusy]   = useState(false);
+  const [errMsg, setErrMsg] = useState("");
+
+  const t = L[lang];
+
+  const reset = () => {
+    setPhase("intro"); setConsent(false); setSex(null);
+    setAge(""); setGenderLbl(""); setGenderOth(""); setOrientLbl(""); setOrientOth("");
+    setGVals([]); setFluidG(false); setOVals([]); setFluidO(false);
+    setBusy(false); setErrMsg("");
+  };
+
+  const notation  = buildNotation(sex, gVals, fluidG, oVals, fluidO);
+  const canSubmit = !!(sex && gVals.length > 0 && oVals.length > 0);
+
+  const gLastOpt = t.genderOpts[t.genderOpts.length - 1];
+  const oLastOpt = t.orientOpts[t.orientOpts.length - 1];
+
+  const submit = async () => {
+    if (!canSubmit || busy) return;
+    setBusy(true); setErrMsg("");
+    const sg = [...gVals].sort((a, b) => a - b);
+    const so = [...oVals].sort((a, b) => a - b);
+    const payload = {
+      timestamp:    new Date().toISOString(),
+      lang, sex,
+      age:          age || "",
+      genderLabel:  genderLbl === gLastOpt ? genderOth : genderLbl,
+      orientLabel:  orientLbl === oLastOpt ? orientOth : orientLbl,
+      genderScores: sg.join(","),
+      fluidGender:  fluidG,
+      orientScores: so.join(","),
+      fluidOrient:  fluidO,
+      notation,
+    };
+    try {
+      const r = await fetch(WEBHOOK, {
+        method: "POST", mode: "cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      setPhase("done");
+    } catch {
+      setErrMsg(t.errMsg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /* Language toggle */
+  const LangToggle = () => (
+    <div style={{ width: "100%", maxWidth: 480, display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+      {["en","it"].map(l => (
+        <button key={l} onClick={() => setLang(l)} style={{
+          background: lang === l ? TD : "transparent",
+          color: lang === l ? "white" : "#9ab",
+          border: `1.5px solid ${lang === l ? TD : "#d4e8e7"}`,
+          borderRadius: 7, padding: "4px 13px", marginLeft: 6,
+          fontSize: 11, fontWeight: "700", cursor: "pointer",
+          fontFamily: "'DM Sans', sans-serif", letterSpacing: 1
+        }}>{l.toUpperCase()}</button>
+      ))}
+    </div>
+  );
+
+  /* ── INTRO ────────────────────────────────────────────────── */
+  if (phase === "intro") return (
+    <div style={wrap}>
+      <LangToggle/>
+      <div style={card}>
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <div style={{ fontSize: 48, lineHeight: 1, marginBottom: 8 }}>🌹</div>
+          <h1 style={{ fontFamily: "'DM Serif Display', serif", color: TD, fontSize: 34, letterSpacing: 3, marginBottom: 2 }}>
+            {t.roseTitle}
+          </h1>
+          <div style={{ color: TL, fontSize: 12, fontWeight: "600", letterSpacing: 5 }}>{t.roseSub}</div>
+        </div>
+        <p style={{ color: "#4a6665", lineHeight: 1.7, fontSize: 14, marginBottom: 10 }}>
+          {t.p1a}<strong style={{ color: "#333" }}>{t.p1b}</strong>
+          {t.p1c}<strong style={{ color: TD }}>{t.p1d}</strong>
+          {t.p1e}<strong style={{ color: TD }}>{t.p1f}</strong>{t.p1g}
+        </p>
+        <p style={{ color: "#8aabaa", lineHeight: 1.7, fontSize: 13, marginBottom: 22 }}>
+          {t.p2a}<strong style={{ color: "#6a8a89" }}>{t.p2b}</strong>{t.p2c}
+        </p>
+        <label style={{
+          display: "flex", alignItems: "flex-start", gap: 11, cursor: "pointer",
+          background: TP, borderRadius: 10, padding: "14px", marginBottom: 22
+        }}>
+          <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)}
+            style={{ marginTop: 2, accentColor: TD, width: 17, height: 17, flexShrink: 0 }}/>
+          <span style={{ fontSize: 13, color: "#4a6665", lineHeight: 1.55 }}>{t.consentText}</span>
+        </label>
+        <button onClick={() => setPhase("sex")} disabled={!consent}
+          style={Btn(consent ? TD : "#c8dede", "white", { width: "100%", fontSize: 15 })}>
+          {t.begin}
+        </button>
+      </div>
+    </div>
+  );
+
+  /* ── SEX ──────────────────────────────────────────────────── */
+  if (phase === "sex") return (
+    <div style={wrap}>
+      <LangToggle/>
+      <div style={card}>
+        <h2 style={{ fontFamily: "'DM Serif Display', serif", color: TD, fontSize: 22, marginBottom: 6 }}>
+          {t.sexTitle}
+        </h2>
+        <p style={{ color: "#8aabaa", fontSize: 13, marginBottom: 22 }}>{t.sexSub}</p>
+        <div style={{ display: "flex", gap: 14, marginBottom: 16 }}>
+          {[
+            { val: "X", symbol: "\u2640", label: t.afab },
+            { val: "Y", symbol: "\u2642", label: t.amab }
+          ].map(opt => (
+            <button key={opt.val} onPointerDown={() => setSex(opt.val)} style={{
+              flex: 1, padding: "22px 12px", borderRadius: 14, cursor: "pointer",
+              border: `2px solid ${sex === opt.val ? TD : "#d4e8e7"}`,
+              background: sex === opt.val ? TP : "white", textAlign: "center",
+              transition: "all 0.15s",
+              boxShadow: sex === opt.val ? "0 4px 16px rgba(42,140,136,0.18)" : "none"
+            }}>
+              <div style={{ fontSize: 42, marginBottom: 10, color: sex === opt.val ? TD : "#8aabaa" }}>
+                {opt.symbol}
+              </div>
+              <div style={{
+                fontSize: 11, color: sex === opt.val ? TD : "#8aabaa",
+                fontWeight: "600", whiteSpace: "pre-line", lineHeight: 1.45
+              }}>{opt.label}</div>
+            </button>
+          ))}
+        </div>
+        <p style={{ fontSize: 11, color: "#b0cac9", lineHeight: 1.55, marginBottom: 22 }}>{t.dsd}</p>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={() => setPhase("intro")}
+            style={Btn("white", "#8aabaa", { border: "1.5px solid #d4e8e7", flex: 1 })}>{t.back}</button>
+          <button onClick={() => setPhase("identity")} disabled={!sex}
+            style={Btn(sex ? TD : "#c8dede", "white", { flex: 1 })}>{t.next}</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* ── IDENTITY ─────────────────────────────────────────────── */
+  if (phase === "identity") {
+    const optBtn = (label, selected, onClick) => (
+      <button key={label} onClick={onClick} style={{
+        display: "block", width: "100%", textAlign: "left",
+        padding: "10px 14px", marginBottom: 6, borderRadius: 9,
+        border: `1.5px solid ${selected ? TD : "#d4e8e7"}`,
+        background: selected ? TP : "white",
+        color: selected ? TD : "#4a6665",
+        fontSize: 13, fontWeight: selected ? "600" : "400",
+        cursor: "pointer", transition: "all 0.12s",
+        fontFamily: "'DM Sans', sans-serif"
+      }}>{label}</button>
+    );
+    const identOk = genderLbl && orientLbl
+      && (genderLbl !== gLastOpt || genderOth.trim())
+      && (orientLbl !== oLastOpt || orientOth.trim());
+    return (
+      <div style={wrap}>
+        <LangToggle/>
+        <div style={card}>
+          <h2 style={{ fontFamily: "'DM Serif Display', serif", color: TD, fontSize: 22, marginBottom: 20 }}>
+            {t.identityTitle}
+          </h2>
+          <div style={{ marginBottom: 22 }}>
+            <label style={{ fontSize: 13, color: "#6a8a89", fontWeight: "600", display: "block", marginBottom: 8 }}>
+              {t.ageQ}
+            </label>
+            <input type="number" value={age} onChange={e => setAge(e.target.value)}
+              min={10} max={99} placeholder="—"
+              style={{
+                width: 100, padding: "10px 14px",
+                border: "1.5px solid #d4e8e7", borderRadius: 9,
+                fontSize: 14, outline: "none", fontFamily: "'DM Sans', sans-serif", color: "#333"
+              }}/>
+          </div>
+          <div style={{ marginBottom: 22 }}>
+            <label style={{ fontSize: 13, color: "#6a8a89", fontWeight: "600", display: "block", marginBottom: 10 }}>
+              {t.genderQ}
+            </label>
+            {t.genderOpts.map(o => optBtn(o, genderLbl === o, () => setGenderLbl(o)))}
+            {genderLbl === gLastOpt && (
+              <input type="text" value={genderOth} onChange={e => setGenderOth(e.target.value)}
+                placeholder={t.otherPh}
+                style={{
+                  width: "100%", padding: "10px 14px", marginTop: 2,
+                  border: `1.5px solid ${T}`, borderRadius: 9,
+                  fontSize: 13, outline: "none", fontFamily: "'DM Sans', sans-serif"
+                }}/>
+            )}
+          </div>
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ fontSize: 13, color: "#6a8a89", fontWeight: "600", display: "block", marginBottom: 10 }}>
+              {t.orientQ}
+            </label>
+            {t.orientOpts.map(o => optBtn(o, orientLbl === o, () => setOrientLbl(o)))}
+            {orientLbl === oLastOpt && (
+              <input type="text" value={orientOth} onChange={e => setOrientOth(e.target.value)}
+                placeholder={t.otherPh}
+                style={{
+                  width: "100%", padding: "10px 14px", marginTop: 2,
+                  border: `1.5px solid ${T}`, borderRadius: 9,
+                  fontSize: 13, outline: "none", fontFamily: "'DM Sans', sans-serif"
+                }}/>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={() => setPhase("sex")}
+              style={Btn("white", "#8aabaa", { border: "1.5px solid #d4e8e7", flex: 1 })}>{t.back}</button>
+            <button onClick={() => setPhase("draw")} disabled={!identOk}
+              style={Btn(identOk ? TD : "#c8dede", "white", { flex: 1 })}>{t.next}</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── DRAW ─────────────────────────────────────────────────── */
+  if (phase === "draw") {
+    const sHead   = { fontFamily: "'DM Serif Display', serif", color: TD, fontSize: 19, marginBottom: 6 };
+    const sDesc   = { fontSize: 13, color: "#8aabaa", lineHeight: 1.6, marginBottom: 14 };
+    const divider = { height: 1, background: "#eaf3f3", margin: "24px 0" };
+    return (
+      <div style={wrap}>
+        <LangToggle/>
+        <div style={card}>
+          <h2 style={{
+            fontFamily: "'DM Serif Display', serif",
+            color: TD, fontSize: 24, textAlign: "center", marginBottom: 24
+          }}>{t.drawTitle}</h2>
+
+          {/* Gender Identity */}
+          <section>
+            <h3 style={sHead}>{t.genderScaleTitle}</h3>
+            <p style={sDesc}>{t.genderDesc}</p>
+            <Scale vals={gVals} fluid={fluidG} onChange={setGVals}
+              leftLabel={t.genderLeft} rightLabel={t.genderRight}/>
+            <FluidBox checked={fluidG} onChange={setFluidG} label={t.fluidLabel} hint={t.fluidHint}/>
+          </section>
+
+          <div style={divider}/>
+
+          {/* Sexual Orientation */}
+          <section>
+            <h3 style={sHead}>{t.orientScaleTitle}</h3>
+            <p style={sDesc}>{t.orientDesc}</p>
+            <Scale vals={oVals} fluid={fluidO} onChange={setOVals}
+              leftLabel={t.orientLeft} rightLabel={t.orientRight}/>
+            <FluidBox checked={fluidO} onChange={setFluidO} label={t.orientFluidLabel} hint={t.orientFluidHint}/>
+          </section>
+
+          <div style={divider}/>
+
+          {/* Wind Rose Preview */}
+          <section>
+            <h3 style={{ ...sHead, textAlign: "center", marginBottom: 16 }}>{t.previewTitle}</h3>
+            <RosePreview gVals={gVals} fluidG={fluidG} oVals={oVals} fluidO={fluidO} t={t}/>
+          </section>
+
+          {/* Notation */}
+          {notation && (
+            <div style={{
+              background: TP, borderRadius: 11, padding: "13px 18px",
+              textAlign: "center", marginTop: 18, border: `1px solid ${TL}`
+            }}>
+              <div style={{ fontSize: 11, color: "#8aabaa", marginBottom: 4, fontWeight: 500 }}>{t.notLbl}</div>
+              <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 22, color: TD, letterSpacing: 1 }}>
+                {notation}
+              </div>
+            </div>
+          )}
+
+          {errMsg && <p style={{ color: CR, fontSize: 13, textAlign: "center", marginTop: 12 }}>{errMsg}</p>}
+
+          <div style={{ display: "flex", gap: 10, marginTop: 22 }}>
+            <button onClick={() => setPhase("identity")}
+              style={Btn("white", "#8aabaa", { border: "1.5px solid #d4e8e7", flex: 1 })}>{t.back}</button>
+            <button onClick={submit} disabled={!canSubmit || busy}
+              style={Btn(canSubmit ? TD : "#c8dede", "white", { flex: 1 })}>
+              {busy ? t.saving : t.submit}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── DONE ─────────────────────────────────────────────────── */
+  return (
+    <div style={{ ...wrap, justifyContent: "center" }}>
+      <div style={{ ...card, textAlign: "center", padding: "40px 28px" }}>
+        <div style={{ fontSize: 60, marginBottom: 14 }}>🌹</div>
+        <h2 style={{ fontFamily: "'DM Serif Display', serif", color: TD, fontSize: 28, marginBottom: 8 }}>
+          {t.doneTitle}
+        </h2>
+        <p style={{ color: "#9ab", fontSize: 14, marginBottom: 24 }}>{t.doneSub}</p>
+        <div style={{ background: TP, borderRadius: 12, padding: "16px 20px", marginBottom: 28, border: `1px solid ${TL}` }}>
+          <div style={{ fontSize: 11, color: "#9ab", marginBottom: 6, fontWeight: 500 }}>{t.doneLabel}</div>
+          <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 24, color: TD, letterSpacing: 1 }}>
+            {notation}
+          </div>
+        </div>
+        <button onClick={reset} style={Btn(TD, "white", { padding: "14px 36px", fontSize: 15 })}>
+          {t.newResp}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
