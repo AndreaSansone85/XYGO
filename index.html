@@ -85,11 +85,30 @@ const L = {
     back:"\u2190 Back", next:"Next \u2192",
     identityTitle:"About you",
     ageQ:"Age",
+    ageReq:"(required)",
     genderQ:"How do you identify your gender?",
     orientQ:"How do you define your sexual orientation?",
-    genderOpts:["Cisgender","Transgender","Agender","Genderless","Pangender","Gender fluid","Other\u2026"],
-    orientOpts:["Heterosexual","Homosexual","Asexual","Pansexual","Bisexual","Other\u2026"],
-    otherPh:"Please specify\u2026",
+    genderOptsAMAB:[
+      "Cisgender (I identify as male)",
+      "Partially cisgender (I partially identify as male)",
+      "Agender (I identify as neither male nor female)",
+      "Genderless (I do not identify with any gender)",
+      "Partially transgender (I partially identify as a woman)",
+      "Transgender (I fully identify as a woman)",
+      "Pangender (I identify as every gender)",
+      "Gender fluid (I do not consistently identify with a single gender)"
+    ],
+    genderOptsAFAB:[
+      "Cisgender (I identify as female)",
+      "Partially cisgender (I partially identify as female)",
+      "Agender (I identify as neither female nor male)",
+      "Genderless (I do not identify with any gender)",
+      "Partially transgender (I partially identify as a man)",
+      "Transgender (I fully identify as a man)",
+      "Pangender (I identify as every gender)",
+      "Gender fluid (I do not consistently identify with a single gender)"
+    ],
+    orientOpts:["Heterosexual","Partially heterosexual","Homosexual","Partially homosexual","Asexual","Pansexual","Bisexual"],
     genderScaleTitle:"Gender Identity",
     genderDesc:"Gender identity is a person\u2019s deeply held internal sense of their own gender. It may or may not align with the sex assigned at birth. Tap one or more points on the vertical scale.",
     genderLeft:"Perceived gender: male",
@@ -134,11 +153,30 @@ const L = {
     back:"\u2190 Indietro", next:"Avanti \u2192",
     identityTitle:"Informazioni su di te",
     ageQ:"Et\u00e0",
+    ageReq:"(obbligatoria)",
     genderQ:"Come definisci la tua identit\u00e0 di genere?",
     orientQ:"Come definisci il tuo orientamento sessuale?",
-    genderOpts:["Cisgender","Transgender","Agender","Senza genere","Pangender","Gender fluid","Altro\u2026"],
-    orientOpts:["Eterosessuale","Omosessuale","Asessuale","Pansessuale","Bisessuale","Altro\u2026"],
-    otherPh:"Specifica\u2026",
+    genderOptsAMAB:[
+      "Cisgender (mi identifico come maschio)",
+      "Parzialmente cisgender (mi identifico parzialmente come maschio)",
+      "Agender (non mi identifico n\u00e9 come maschio, n\u00e9 come femmina)",
+      "Senza genere (non mi identifico in alcun genere)",
+      "Parzialmente transgender (mi identifico parzialmente come donna)",
+      "Transgender (mi identifico completamente come donna)",
+      "Pangender (mi identifico come ogni genere)",
+      "Gender fluid (non mi identifico stabilmente in un solo genere)"
+    ],
+    genderOptsAFAB:[
+      "Cisgender (mi identifico come femmina)",
+      "Parzialmente cisgender (mi identifico parzialmente come femmina)",
+      "Agender (non mi identifico n\u00e9 come femmina, n\u00e9 come maschio)",
+      "Senza genere (non mi identifico in alcun genere)",
+      "Parzialmente transgender (mi identifico parzialmente come uomo)",
+      "Transgender (mi identifico completamente come uomo)",
+      "Pangender (mi identifico come ogni genere)",
+      "Gender fluid (non mi identifico stabilmente in un solo genere)"
+    ],
+    orientOpts:["Eterosessuale","Parzialmente eterosessuale","Omosessuale","Parzialmente omosessuale","Asessuale","Pansessuale","Bisessuale"],
     genderScaleTitle:"Identit\u00e0 di genere",
     genderDesc:"L\u2019identit\u00e0 di genere \u00e8 la percezione intima e profonda che una persona ha del proprio genere. Pu\u00f2 o meno corrispondere al sesso assegnato alla nascita. Tocca uno o pi\u00f9 punti sulla scala verticale.",
     genderLeft:"Genere percepito: maschile",
@@ -245,12 +283,12 @@ function GenderScaleSVG({ vals, fluid, onChange, t }) {
               strokeWidth={2.5}
               style={{ filter: selected ? "drop-shadow(0 2px 6px rgba(42,140,136,0.35))" : "none" }}
             />
-            {/* Label */}
+            {/* Label — solo valore assoluto nella UI; il segno resta nel payload e nella notazione */}
             <text cx={CX} x={CX} y={py(p)} textAnchor="middle" dominantBaseline="middle"
               fontSize={10} fontFamily="DM Sans" fontWeight="700"
               fill={selected ? "white" : inRange ? TD : "#aabcbb"}
               style={{ pointerEvents: "none" }}>
-              {p === 0 ? "0" : p > 0 ? `+${p}` : `${p}`}
+              {Math.abs(p)}
             </text>
           </g>
         );
@@ -354,7 +392,7 @@ function OrientScaleSVG({ gVals, fluidG, vals, fluid, onChange, t }) {
               fontSize={10} fontFamily="DM Sans" fontWeight="700"
               fill={selected ? "white" : inRange ? TD : "#aabcbb"}
               style={{ pointerEvents: "none" }}>
-              {p === 0 ? "0" : p > 0 ? `+${p}` : `${p}`}
+              {Math.abs(p)}
             </text>
           </g>
         );
@@ -579,9 +617,7 @@ function App() {
   const [sex,       setSex]       = useState(null);
   const [age,       setAge]       = useState("");
   const [genderLbl, setGenderLbl] = useState("");
-  const [genderOth, setGenderOth] = useState("");
   const [orientLbl, setOrientLbl] = useState("");
-  const [orientOth, setOrientOth] = useState("");
   const [gVals,     setGVals]     = useState([]);
   const [fluidG,    setFluidG]    = useState(false);
   const [oVals,     setOVals]     = useState([]);
@@ -591,18 +627,21 @@ function App() {
 
   const t = L[lang];
 
+  /* genderOpts dipende dal sesso biologico selezionato */
+  const genderOpts = sex === "Y" ? t.genderOptsAMAB : t.genderOptsAFAB;
+
   const reset = () => {
     setPhase("intro"); setConsent(false); setSex(null);
-    setAge(""); setGenderLbl(""); setGenderOth(""); setOrientLbl(""); setOrientOth("");
+    setAge(""); setGenderLbl(""); setOrientLbl("");
     setGVals([]); setFluidG(false); setOVals([]); setFluidO(false);
     setBusy(false); setErrMsg("");
   };
 
   const notation  = buildNotation(sex, gVals, fluidG, oVals, fluidO);
-  const canSubmit = !!(sex && gVals.length > 0 && oVals.length > 0);
+  const ageValid  = age && parseInt(age) >= 10 && parseInt(age) <= 99;
+  const canSubmit = !!(sex && ageValid && gVals.length > 0 && oVals.length > 0 && genderLbl && orientLbl);
 
-  const gLastOpt = t.genderOpts[t.genderOpts.length - 1];
-  const oLastOpt = t.orientOpts[t.orientOpts.length - 1];
+  
 
   const submit = async () => {
     if (!canSubmit || busy) return;
@@ -613,8 +652,8 @@ function App() {
       timestamp:    new Date().toISOString(),
       lang, sex,
       age:          age || "",
-      genderLabel:  genderLbl === gLastOpt ? genderOth : genderLbl,
-      orientLabel:  orientLbl === oLastOpt ? orientOth : orientLbl,
+      genderLabel:  genderLbl,
+      orientLabel:  orientLbl,
       genderScores: sg.join(","),
       fluidGender:  fluidG,
       orientScores: so.join(","),
@@ -693,11 +732,27 @@ function App() {
     <div style={wrap}>
       <LangToggle/>
       <div style={card}>
-        <StepDots current={0} total={5}/>
+        <StepDots current={0} total={4}/>
         <h2 style={{ fontFamily: "'DM Serif Display', serif", color: TD, fontSize: 22, marginBottom: 6 }}>
           {t.sexTitle}
         </h2>
         <p style={{ color: "#8aabaa", fontSize: 13, marginBottom: 22 }}>{t.sexSub}</p>
+
+        {/* Età obbligatoria */}
+        <div style={{ marginBottom: 22 }}>
+          <label style={{ fontSize: 13, color: "#6a8a89", fontWeight: "600", display: "block", marginBottom: 8 }}>
+            {t.ageQ} <span style={{ fontWeight: 400, color: "#b0cac9" }}>{t.ageReq}</span>
+          </label>
+          <input type="number" value={age} onChange={e => setAge(e.target.value)}
+            min={10} max={99} placeholder="—"
+            style={{
+              width: 100, padding: "10px 14px",
+              border: `1.5px solid ${ageValid || !age ? "#d4e8e7" : CR}`,
+              borderRadius: 9,
+              fontSize: 14, outline: "none", fontFamily: "'DM Sans', sans-serif", color: "#333"
+            }}/>
+        </div>
+
         <div style={{ display: "flex", gap: 14, marginBottom: 16 }}>
           {[
             { val: "X", symbol: "\u2640", label: t.afab },
@@ -724,8 +779,8 @@ function App() {
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={() => setPhase("intro")}
             style={Btn("white", "#8aabaa", { border: "1.5px solid #d4e8e7", flex: 1 })}>{t.back}</button>
-          <button onClick={() => setPhase("identity")} disabled={!sex}
-            style={Btn(sex ? TD : "#c8dede", "white", { flex: 1 })}>{t.next}</button>
+          <button onClick={() => setPhase("drawG")} disabled={!sex || !ageValid}
+            style={Btn(sex && ageValid ? TD : "#c8dede", "white", { flex: 1 })}>{t.next}</button>
         </div>
       </div>
     </div>
@@ -745,45 +800,21 @@ function App() {
         fontFamily: "'DM Sans', sans-serif"
       }}>{label}</button>
     );
-    const identOk = genderLbl && orientLbl
-      && (genderLbl !== gLastOpt || genderOth.trim())
-      && (orientLbl !== oLastOpt || orientOth.trim());
+    const identOk = !!(genderLbl && orientLbl);
     return (
       <div style={wrap}>
         <LangToggle/>
         <div style={card}>
-          <StepDots current={1} total={5}/>
+          <StepDots current={3} total={4}/>
           <h2 style={{ fontFamily: "'DM Serif Display', serif", color: TD, fontSize: 22, marginBottom: 20 }}>
             {t.identityTitle}
           </h2>
-          {/* Age */}
-          <div style={{ marginBottom: 22 }}>
-            <label style={{ fontSize: 13, color: "#6a8a89", fontWeight: "600", display: "block", marginBottom: 8 }}>
-              {t.ageQ}
-            </label>
-            <input type="number" value={age} onChange={e => setAge(e.target.value)}
-              min={10} max={99} placeholder="—"
-              style={{
-                width: 100, padding: "10px 14px",
-                border: "1.5px solid #d4e8e7", borderRadius: 9,
-                fontSize: 14, outline: "none", fontFamily: "'DM Sans', sans-serif", color: "#333"
-              }}/>
-          </div>
-          {/* Gender label */}
+          {/* Gender label — opzioni dipendenti dal sesso biologico */}
           <div style={{ marginBottom: 22 }}>
             <label style={{ fontSize: 13, color: "#6a8a89", fontWeight: "600", display: "block", marginBottom: 10 }}>
               {t.genderQ}
             </label>
-            {t.genderOpts.map(o => optBtn(o, genderLbl === o, () => setGenderLbl(o)))}
-            {genderLbl === gLastOpt && (
-              <input type="text" value={genderOth} onChange={e => setGenderOth(e.target.value)}
-                placeholder={t.otherPh}
-                style={{
-                  width: "100%", padding: "10px 14px", marginTop: 2,
-                  border: `1.5px solid ${T}`, borderRadius: 9,
-                  fontSize: 13, outline: "none", fontFamily: "'DM Sans', sans-serif"
-                }}/>
-            )}
+            {genderOpts.map(o => optBtn(o, genderLbl === o, () => setGenderLbl(o)))}
           </div>
           {/* Orientation label */}
           <div style={{ marginBottom: 24 }}>
@@ -791,21 +822,32 @@ function App() {
               {t.orientQ}
             </label>
             {t.orientOpts.map(o => optBtn(o, orientLbl === o, () => setOrientLbl(o)))}
-            {orientLbl === oLastOpt && (
-              <input type="text" value={orientOth} onChange={e => setOrientOth(e.target.value)}
-                placeholder={t.otherPh}
-                style={{
-                  width: "100%", padding: "10px 14px", marginTop: 2,
-                  border: `1.5px solid ${T}`, borderRadius: 9,
-                  fontSize: 13, outline: "none", fontFamily: "'DM Sans', sans-serif"
-                }}/>
-            )}
           </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={() => setPhase("sex")}
+
+          {/* Notation preview */}
+          {notation && (
+            <div style={{
+              background: TP, borderRadius: 11,
+              padding: "12px 16px", textAlign: "center",
+              marginBottom: 18, border: `1px solid ${TL}`
+            }}>
+              <div style={{ fontSize: 11, color: "#8aabaa", marginBottom: 4, fontWeight: 500 }}>{t.notLbl}</div>
+              <div style={{
+                fontFamily: "'DM Serif Display', serif",
+                fontSize: 22, color: TD, letterSpacing: 1
+              }}>{notation}</div>
+            </div>
+          )}
+
+          {errMsg && <p style={{ color: CR, fontSize: 13, textAlign: "center", marginTop: 12 }}>{errMsg}</p>}
+
+          <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+            <button onClick={() => setPhase("drawO")}
               style={Btn("white", "#8aabaa", { border: "1.5px solid #d4e8e7", flex: 1 })}>{t.back}</button>
-            <button onClick={() => setPhase("drawG")} disabled={!identOk}
-              style={Btn(identOk ? TD : "#c8dede", "white", { flex: 1 })}>{t.next}</button>
+            <button onClick={submit} disabled={!identOk || busy}
+              style={Btn(identOk ? TD : "#c8dede", "white", { flex: 1 })}>
+              {busy ? t.saving : t.submit}
+            </button>
           </div>
         </div>
       </div>
@@ -817,7 +859,7 @@ function App() {
     <div style={wrap}>
       <LangToggle/>
       <div style={card}>
-        <StepDots current={2} total={5}/>
+        <StepDots current={1} total={4}/>
         <h2 style={{
           fontFamily: "'DM Serif Display', serif",
           color: TD, fontSize: 22, marginBottom: 6
@@ -846,7 +888,7 @@ function App() {
         />
 
         <div style={{ display: "flex", gap: 10, marginTop: 22 }}>
-          <button onClick={() => setPhase("identity")}
+          <button onClick={() => setPhase("sex")}
             style={Btn("white", "#8aabaa", { border: "1.5px solid #d4e8e7", flex: 1 })}>{t.back}</button>
           <button onClick={() => setPhase("drawO")} disabled={gVals.length === 0}
             style={Btn(gVals.length > 0 ? TD : "#c8dede", "white", { flex: 1 })}>{t.next}</button>
@@ -860,7 +902,7 @@ function App() {
     <div style={wrap}>
       <LangToggle/>
       <div style={card}>
-        <StepDots current={3} total={5}/>
+        <StepDots current={2} total={4}/>
         <h2 style={{
           fontFamily: "'DM Serif Display', serif",
           color: TD, fontSize: 22, marginBottom: 6
@@ -903,10 +945,8 @@ function App() {
         <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
           <button onClick={() => setPhase("drawG")}
             style={Btn("white", "#8aabaa", { border: "1.5px solid #d4e8e7", flex: 1 })}>{t.back}</button>
-          <button onClick={submit} disabled={!canSubmit || busy}
-            style={Btn(canSubmit ? TD : "#c8dede", "white", { flex: 1 })}>
-            {busy ? t.saving : t.submit}
-          </button>
+          <button onClick={() => setPhase("identity")} disabled={oVals.length === 0}
+            style={Btn(oVals.length > 0 ? TD : "#c8dede", "white", { flex: 1 })}>{t.next}</button>
         </div>
       </div>
     </div>
